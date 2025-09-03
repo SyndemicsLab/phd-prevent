@@ -22,7 +22,7 @@ On a weekly basis, the PHD will also send out updates to variable changes or dat
 
 # The PHD-PreVenT Project
 
-The purpose of MA DPH's PHDW integration with the PreVenT model is assess disparities in race/ethnicity and age the OUD care cascade for women of reproductive age in Massachusetts
+The purpose of MA DPH's PHDW integration with the PreVenT model is to assess disparities in race/ethnicity and age the OUD care cascade for women of reproductive age in Massachusetts
 PreVenT relies primarily on these scripts:
 
 1. *RESPOND*: Develops the Opioid Use Disorder (OUD) cohort by looking through APCD, Casemix, Death, Matris, PMP, and BSAS. This script forms the basis for other scripts when involving the 'OUD Cohort.' The second part of the script Utilizes the PHD created MOUD Spine dataset to determine how many people are starting, or in, either methadone, buprenorphine, and/or naltrexone treatments. Up until this point, the script is the same as the RESPOND model scripts. The final portion of the script differs from the RESPOND model (or, rather, is in addition to) and uses APCD medical and pharmacy records to pull HCV testing and linkage data to define the cascade of care.
