@@ -3489,18 +3489,6 @@ proc sql;
       and b.EVENT_MONTH_HCV is not missing;
 quit;
 
-proc sql;
-    select 
-        sum(case when months_between < 0 then 1 else 0 end) as count_early_report,
-        count(*) as total_cases,
-        calculated count_early_report / calculated total_cases as percent_early_report format=percent8.2
-    from linkage_analysis;
-quit;
-
-proc means data=linkage_analysis mean median std min max;
-    var months_between;
-run;
-
 proc sort data=LONG_FINAL_HCV_COHORT;
     by ID year month;
 run;
@@ -3675,75 +3663,6 @@ proc sql;
     on a.ID = b.ID;
 quit;
 
-/* data want(keep=ID cnt_DAA_starts);
-  set LONG_FINAL_HCV_COHORT;
-  by ID;
-  
-  retain cnt_DAA_starts 0;
-  
-  if first.ID then cnt_DAA_starts = 0;
-  
-  if DAA_START_INDICATOR = 1 then cnt_DAA_starts = cnt_DAA_starts + 1;
-  
-  if last.ID then output;
-run;
-
-data want_nonzero;
-  set want;
-  if cnt_DAA_starts > 0;
-run;
-
-proc univariate data=want_nonzero noprint;
-  var cnt_DAA_starts;
-  output out=summary_stats_nonzero mean=mean_DAA_starts median=median_DAA_starts range=range_DAA_starts;
-run;
-
-proc print data=summary_stats_nonzero;
-  title 'Summary Statistics of Number of DAA Starts per ID (Only IDs with at least 1 DAA Start)';
-run;
-
-data daa_intervals (keep=ID months_between DAA_order);
-  set LONG_FINAL_HCV_COHORT;
-  by ID;
-
-  retain prev_DAA_month DAA_order;
-
-  if first.ID then do;
-    prev_DAA_month = .;
-    DAA_order = 0;
-  end;
-
-  if DAA_START_INDICATOR = 1 then do;
-    DAA_order + 1;
-
-    if prev_DAA_month ne . then do;
-      months_between = (YEAR * 12 + MONTH) - prev_DAA_month;
-      output;
-    end;
-
-    prev_DAA_month = YEAR * 12 + MONTH;
-  end;
-run;
-
-proc univariate data=daa_intervals noprint;
-  var months_between;
-  output out=summary_intervals mean=mean_months median=median_months range=range_months;
-run;
-
-proc print data=summary_intervals;
-  title 'Summary Statistics of Months Between Consecutive DAA Starts';
-run;
-
-proc freq data=daa_intervals;
-  tables months_between / missing;
-  title 'Distribution of Months Between Consecutive DAA Starts';
-run;
-
-proc freq data=daa_intervals;
-  tables DAA_order;
-  title 'Distribution of Number of DAA Starts per Individual';
-run; */
-
 /* ========================= */
 /* 5. Define pregnany states */
 /* ========================= */
@@ -3905,24 +3824,6 @@ proc sql;
 quit;
 
 proc sql;
-    create table pre_case_report_claims as
-    select a.ID, count(*) as claims_before_case_report
-    from LONG_FINAL_HCV_COHORT as a
-    inner join case_report_events as c
-    on a.ID = c.ID
-    where (a.year*12 + a.month) < c.case_report_period
-        and not missing(a.MED_FROM_DATE_MONTH)
-        and not missing(a.MED_FROM_DATE_YEAR)
-    group by a.ID;
-quit;
-
-title "Frequency of Claims Processed Before Case Report";
-proc freq data=pre_case_report_claims;
-    tables claims_before_case_report;
-run;
-title;
-
-proc sql;
     create table pre_case_report_counts as
     select 
         sum(HCV_PRIMARY_DIAG1) as early_HCV_PRIMARY_DIAG1,
@@ -3987,24 +3888,6 @@ proc sql;
     where death_flag = 1
     group by ID;
 quit;
-
-proc sql;
-    create table post_death_claims as
-    select a.ID, count(*) as claims_after_death
-    from LONG_FINAL_HCV_COHORT as a
-    inner join death_events as d
-    on a.ID = d.ID
-    where (a.year*12 + a.month) > d.death_period
-        and not missing(a.MED_FROM_DATE_MONTH)
-        and not missing(a.MED_FROM_DATE_YEAR)
-    group by a.ID;
-quit;
-
-title "Frequency of claims processed after death";
-proc freq data=post_death_claims;
-    tables claims_after_death;
-run;
-title;
 
 proc sql;
     create table post_death_counts as
@@ -4439,7 +4322,7 @@ title;
 /* 16. Sensitivity Anlysis: Treatment Eligbility on Case Report Date  */
 /* ================================================================== */
 
-title 'Sensitivity Anlysis: Treatment Eligbility on Case Report Date; Treatment Starts by DAA_Timing';
+title 'Sensitivity Analysis: Treatment Eligbility on Case Report Date; Treatment Starts by DAA_Timing';
 proc sql;
     select 
         DAA_Timing,
@@ -4454,7 +4337,7 @@ proc sql;
 quit;
 title;
 
-title 'Sensitivity Anlysis: Treatment Eligbility on Case Report Date, Overall';
+title 'Sensitivity Analysis: Treatment Eligbility on Case Report Date, Overall';
 proc sql;
     select 
         sum(daa_start) as daa_start,
@@ -4462,7 +4345,7 @@ proc sql;
     from PERIOD_SUMMARY_FINAL;
 quit;
 
-title 'Sensitivity Anlysis: Treatment Eligbility on Case Report Date, by Pregnancy Status';
+title 'Sensitivity Analysis: Treatment Eligbility on Case Report Date, by Pregnancy Status';
 proc sql;
     select 
         group,
