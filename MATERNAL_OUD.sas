@@ -3113,7 +3113,7 @@ QUIT;
 %ChiSquareTest(LANGUAGE_SPOKEN_GROUP, HOMELESS_HISTORY_GROUP);
 %ChiSquareTest(LANGUAGE_SPOKEN_GROUP, EVER_INCARCERATED);
 
-%ChiSquareTest(EDUCATION_GROUP, INSURANCE_CAT);
+%ChiSquareTest(EDUCATION_GROUP, LANGUAGE_SPOKEN_GROUP);
 
 /*===============================*/
 /*  Part 4: Calculate MOUD Rates */
@@ -3197,6 +3197,9 @@ proc sql;
         all select put(b.MATERNAL_ID, $10.), b.MONTH_BIRTH, b.YEAR_BIRTH,
         b.GESTATIONAL_AGE from fetal_deaths_renamed as b;
 quit;
+
+%let start_year=%scan(%substr(&year,2,%length(&year)-2),1,':');
+%let end_year=%scan(%substr(&year,2,%length(&year)-2),2,':');
 
 data pregnancy_flags;
     set merged_births_infants;
@@ -3300,9 +3303,6 @@ data pregnancy_flags;
 
     if first.month then output;
 run;
-
-%let start_year=%scan(%substr(&year,2,%length(&year)-2),1,':');
-%let end_year=%scan(%substr(&year,2,%length(&year)-2),2,':');
 
 DATA months;
     DO month=1 to 12;
@@ -3537,8 +3537,11 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         else if preg_flag=3 then group=3; /* 7-12 months post-partum */
         else if preg_flag=4 then group=4; /* 13-18 months post-partum */
         else if preg_flag=5 then group=4; /* 19-24 months post-partum */
-        else if preg_flag=6 then group=5; /* > 24 months post-partum */
-        else if preg_flag=9999 then group=0; /* Non-pregnant */
+        else if preg_flag=6 then group=5; /* >24 months post-partum */
+        else if preg_flag=9999 and has_pregnancy=1 then group=6;
+        /* Pre-first pregnancy */
+        else if preg_flag=9999 and has_pregnancy=0 then group=0;
+        /* Never pregnant */
     run;
 
     /* Reduce from EPISODE_LEVEL to PERSON_LEVEL */
@@ -3712,40 +3715,6 @@ PROC SQL;
         PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
 QUIT;
 
-/* ods exclude CensoredSummary;
-title "Cox Proportional Hazard by Pregnancy Group";
-proc phreg data=PREPARED_DATA;
-class group (ref="0");
-model moud_duration*moud_cessation(1) = group;
-strata ID;
-hazardratio group / diff=ref;
-
-assess ph;
-
-output out=surv_data survival=survival;
-run;
-
-%macro cox_prop(group_by_vars, mytitle);
-ods exclude CensoredSummary;
-title &mytitle;
-
-proc phreg data=PREPARED_DATA;
-class group (ref="0") &group_by_vars;
-model moud_duration*moud_cessation(1) = group &group_by_vars;
-strata ID;
-hazardratio group / diff=ref;
-
-assess ph;
-
-output out=surv_data survival=survival;
-run;
-%mend cox_prop;
-
-%cox_prop(age_grp, "Cox Proportional Hazard by Pregnancy Group, Stratified by Age");
-%cox_prop(FINAL_RE, "Cox Proportional Hazard by Pregnancy Group, Stratified by FINAL_RE");
-%cox_prop(IDU_EVIDENCE, "Cox Proportional Hazard by Pregnancy Group, Stratified by IDU_EVIDENCE");
-
-ods select all; */
 proc sql;
     create table summed_data as select ID, sum(eligble_cessation) as
         total_person_time_cessation from PERIOD_SUMMARY_FINAL group by ID;
@@ -3830,8 +3799,11 @@ data moud_spine_preg;
     else if preg_flag=3 then group=3; /* 7-12 months post-partum */
     else if preg_flag=4 then group=4; /* 13-18 months post-partum */
     else if preg_flag=5 then group=4; /* 19-24 months post-partum */
-    else if preg_flag=6 then group=5; /* > 24 months post-partum */
-    else if preg_flag=9999 then group=0; /* Non-pregnant */
+    else if preg_flag=6 then group=5; /* >24 months post-partum */
+    else if preg_flag=9999 and has_pregnancy=1 then group=6;
+    /* Pre-first pregnancy */
+    else if preg_flag=9999 and has_pregnancy=0 then group=0;
+    /* Never pregnant */
 run;
 
 proc sql;
@@ -3849,12 +3821,12 @@ quit;
 proc sql;
     create table PERSON_TIME as select ID, moud_start_group, group, sum(case
         when moud_flag=1 then 1 else 0 end) as eligble_cessation from
-        PREPARED_DATA group by ID, moud_start_group;
+        PREPARED_DATA group by ID, group, moud_start_group;
 quit;
 
 proc sql;
     create table PERIOD_SUMMARY as select ID, moud_start_group, group,
-        sum(moud_cessation) as moud_stops from PREPARED_DATA group by ID,
+        sum(moud_cessation) as moud_stops from PREPARED_DATA group by ID, group,
         moud_start_group;
 quit;
 
@@ -4474,8 +4446,8 @@ quit;
 
 /* This step reduces the dataset to unique ID-month-year combinations and retains the maximum MOUD flag value for each combination. */
 proc sql;
-    create table moud_summary as select distinct ID, month, year, max(moud_flag)
-        as moud_flag from moud_summary group by ID, month, year;
+    create table moud_summary as select distinct ID, month, year, has_pregnancy,
+        max(moud_flag) as moud_flag from moud_summary group by ID, month, year;
 quit;
 
 /*====================================================*/
@@ -4520,8 +4492,11 @@ data prepared_data;
     else if preg_flag=3 then group=3; /* 7-12 months post-partum */
     else if preg_flag=4 then group=4; /* 13-18 months post-partum */
     else if preg_flag=5 then group=4; /* 19-24 months post-partum */
-    else if preg_flag=6 then group=5; /* > 24 months post-partum */
-    else if preg_flag=9999 then group=0; /* Non-pregnant */
+    else if preg_flag=6 then group=5; /* >24 months post-partum */
+    else if preg_flag=9999 and has_pregnancy=1 then group=6;
+    /* Pre-first pregnancy */
+    else if preg_flag=9999 and has_pregnancy=0 then group=0;
+    /* Never pregnant */
     /* Categorize individuals based on MOUD and post-treatment flags */
     if moud_flag=1 and posttxt_flag=0 then treat_group=1; /* On MOUD */
     else if moud_flag=1 and posttxt_flag=1 then treat_group=2; /* Post-TXT */
@@ -4880,162 +4855,6 @@ quit;
     'Overdoses by Treatment Group, Stratified by rural_group');
 %calculate_rates(BIRTH_INDICATOR,
     'Overdoses by Treatment Group, Stratified by BIRTH_INDICATOR');
-title;
-
-proc sql;
-    create table moud_spine_preg as select distinct ID, month, year,
-        max(moud_start_group) as moud_start_group from moud_spine_preg group by
-        ID, month, year;
-quit;
-
-proc sql;
-    create table PREPARED_DATA as select a.*, coalesce(b.moud_start_group, 0) as
-        moud_start_group from PREPARED_DATA a left join moud_spine_preg b on
-        a.ID=b.ID and a.month=b.month and a.year=b.year;
-quit;
-
-proc sql;
-    create table PERSON_TIME as select ID, moud_start_group, count(month) as
-        person_time from PREPARED_DATA group by ID, moud_start_group;
-quit;
-
-proc sql;
-    create table PERIOD_SUMMARY as select ID, moud_start_group, sum(od_flag) as
-        overdoses, sum(fod_flag) as fatal_overdoses from PREPARED_DATA group by
-        ID, moud_start_group;
-quit;
-
-proc sort data=PERSON_TIME;
-    by ID moud_start_group;
-run;
-
-proc sort data=PERIOD_SUMMARY;
-    by ID moud_start_group;
-run;
-
-data PERIOD_SUMMARY_FINAL;
-    merge PERIOD_SUMMARY PERSON_TIME;
-    by ID moud_start_group;
-run;
-
-PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, demographics.FINAL_RE,
-        demographics.FINAL_SEX, demographics.EDUCATION,
-        demographics.EVER_INCARCERATED, demographics.FOREIGN_BORN,
-        demographics.HOMELESS_EVER, demographics.YOB FROM PERIOD_SUMMARY_FINAL
-        AS a LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
-QUIT;
-
-PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.INSURANCE_CAT,
-        cov.OTHER_SUBSTANCE_USE, cov.rural_group, cov.HCV_SEROPOSITIVE_INDICATOR
-        FROM PERIOD_SUMMARY_FINAL AS a LEFT JOIN FINAL_COHORT AS cov ON a.ID=
-        cov.ID;
-QUIT;
-
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select a.*, b.BIRTH_INDICATOR from
-        PERIOD_SUMMARY_FINAL a left join births b on a.ID=b.ID;
-quit;
-
-PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT DISTINCT * FROM
-        PERIOD_SUMMARY_FINAL WHERE BIRTH_INDICATOR=1;
-QUIT;
-
-data PERIOD_SUMMARY_FINAL;
-    length HOMELESS_HISTORY_GROUP $10;
-    set PERIOD_SUMMARY_FINAL;
-    if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
-    else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
-    else HOMELESS_HISTORY_GROUP='Unknown';
-run;
-
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select *, case when ID in (select ID
-        from IJI_COHORT) then 1 else 0 end as IJI_DIAG from
-        PERIOD_SUMMARY_FINAL;
-quit;
-
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY_FINAL.*,
-        hcv.EVER_IDU_HCV from PERIOD_SUMMARY_FINAL left join HCV_STATUS as hcv
-        on PERIOD_SUMMARY_FINAL.ID=hcv.ID;
-quit;
-
-data PERIOD_SUMMARY_FINAL;
-    set PERIOD_SUMMARY_FINAL;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
-    else IDU_EVIDENCE=0;
-run;
-
-PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.agegrp FROM
-        PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
-QUIT;
-
-title 'Overdoses by moud_start_group Group, Overall';
-
-proc sql;
-    select moud_start_group, count(*) as total_n, sum(overdoses) as overdoses,
-        sum(fatal_overdoses) as fatal_overdoses, sum(person_time) as
-        total_person_time, calculated overdoses / calculated total_person_time
-        as overdoses_rate format=8.4, (calculated overdoses - 1.96 *
-        sqrt(calculated overdoses)) / calculated total_person_time as
-        overdoses_rate_lower format=8.4, (calculated overdoses + 1.96 *
-        sqrt(calculated overdoses)) / calculated total_person_time as
-        overdoses_rate_upper format=8.4, calculated fatal_overdoses / calculated
-        total_person_time as fatal_overdoses_rate format=8.4, (calculated
-        fatal_overdoses - 1.96 * sqrt(calculated fatal_overdoses)) / calculated
-        total_person_time as fatal_overdoses_rate_lower format=8.4, (calculated
-        fatal_overdoses + 1.96 * sqrt(calculated fatal_overdoses)) / calculated
-        total_person_time as fatal_overdoses_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by moud_start_group;
-quit;
-
-%macro calculate_rates(group_by_vars, mytitle);
-    title &mytitle;
-
-    proc sql;
-        select moud_start_group, &group_by_vars, count(*) as total_n,
-            sum(overdoses) as overdoses, sum(fatal_overdoses) as
-            fatal_overdoses, sum(person_time) as total_person_time, calculated
-            overdoses / calculated total_person_time as overdoses_rate
-            format=8.4, (calculated overdoses - 1.96 * sqrt(calculated
-            overdoses)) / calculated total_person_time as overdoses_rate_lower
-            format=8.4, (calculated overdoses + 1.96 * sqrt(calculated
-            overdoses)) / calculated total_person_time as overdoses_rate_upper
-            format=8.4, calculated fatal_overdoses / calculated
-            total_person_time as fatal_overdoses_rate format=8.4, (calculated
-            fatal_overdoses - 1.96 * sqrt(calculated fatal_overdoses)) /
-            calculated total_person_time as fatal_overdoses_rate_lower
-            format=8.4, (calculated fatal_overdoses + 1.96 * sqrt(calculated
-            fatal_overdoses)) / calculated total_person_time as
-            fatal_overdoses_rate_upper format=8.4 from PERIOD_SUMMARY_FINAL
-            group by moud_start_group, &group_by_vars;
-    quit;
-%mend calculate_rates;
-
-%calculate_rates(agegrp,
-    'Overdoses by moud_start_group Group, Stratified by Age');
-%calculate_rates(FINAL_RE,
-    'Overdoses by moud_start_group Group, Stratified by FINAL_RE');
-%calculate_rates(EDUCATION,
-    'Overdoses by moud_start_group Group, Stratified by EDUCATION');
-%calculate_rates(HOMELESS_HISTORY_GROUP,
-    'Overdoses by moud_start_group Group, Stratified by HOMELESS_HISTORY');
-%calculate_rates(EVER_INCARCERATED,
-    'Overdoses by moud_start_group Group, Stratified by EVER_INCARCERATED');
-%calculate_rates(IDU_EVIDENCE,
-    'Overdoses by moud_start_group Group, Stratified by IDU_EVIDENCE');
-%calculate_rates(INSURANCE_CAT,
-    'Overdoses by moud_start_group Group, Stratified by INSURANCE_CAT');
-%calculate_rates(HCV_SEROPOSITIVE_INDICATOR,
-    'Overdoses by moud_start_group Group, Stratified by HCV_SEROPOSITIVE_INDICATOR');
-%calculate_rates(OTHER_SUBSTANCE_USE,
-    'Overdoses by moud_start_group Group, Stratified by OTHER_SUBSTANCE_USE');
-%calculate_rates(rural_group,
-    'Overdoses by moud_start_group Group, Stratified by rural_group');
 title;
 
 /*==========================================*/
