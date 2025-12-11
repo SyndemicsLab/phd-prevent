@@ -1393,6 +1393,10 @@ PROC CONTENTS data=FILTERED_INFANT_COHORT;
     title "Contents of Final FILTERED_INFANT_COHORT Dataset";
 run;
 
+proc sort data=FILTERED_INFANT_COHORT;
+    by MOM_ID;
+run;
+
 data want(keep=MOM_ID cnt_deliveries);
     set FILTERED_INFANT_COHORT;
     by MOM_ID;

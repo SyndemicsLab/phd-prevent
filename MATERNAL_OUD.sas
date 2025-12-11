@@ -3532,13 +3532,14 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         /* Create a unique time index */
         time_index=(year - 2014) * 12 + month;
 
-        if preg_flag=1 then group=1; /* Pregnant */
-        else if preg_flag=2 then group=2; /* 0-6 months post-partum */
-        else if preg_flag=3 then group=3; /* 7-12 months post-partum */
-        else if preg_flag=4 then group=4; /* 13-18 months post-partum */
-        else if preg_flag=5 then group=4; /* 19-24 months post-partum */
-        else if preg_flag=6 then group=5; /* >24 months post-partum */
-        else if preg_flag=9999 and has_pregnancy=1 then group=6;
+        /* Categorize individuals based on pregnancy and post-partum status */
+        if preg_flag=1 then group=6; /* Pregnant */
+        else if preg_flag=2 then group=5; /* 0-6 months post-partum */
+        else if preg_flag=3 then group=4; /* 7-12 months post-partum */
+        else if preg_flag=4 then group=3; /* 13-18 months post-partum */
+        else if preg_flag=5 then group=3; /* 19-24 months post-partum */
+        else if preg_flag=6 then group=2; /* >24 months post-partum */
+        else if preg_flag=9999 and has_pregnancy=1 then group=1;
         /* Pre-first pregnancy */
         else if preg_flag=9999 and has_pregnancy=0 then group=0;
         /* Never pregnant */
@@ -3550,7 +3551,7 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
             max(moud_flag) as moud_flag, max(moud_init) as moud_init,
             max(moud_duration) as moud_duration, max(moud_cessation) as
             moud_cessation, min(preg_flag) as preg_flag from PREPARED_DATA group
-            by ID, month, year;
+            by ID, year, month;
     quit;
 
     /* Censor on death and assess event temporality with regard to death date (i.e. claims processed after death)  */
@@ -3600,6 +3601,44 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
             month > MONTH_DEATH)) then delete;
 
         drop death_flag_forward;
+    run;
+
+    proc sql;
+        create table CENSORED as select a.*, b.MA2014, b.MA2015, b.MA2016,
+            b.MA2017, b.MA2018, b.MA2019, b.MA2020, b.MA2021, b.MA2022 from
+            PREPARED_DATA as a left join PHDSPINE.DEMO as b on a.ID=b.ID;
+    quit;
+
+    proc sort data=CENSORED;
+        by ID year month;
+    run;
+
+    data CENSORED2;
+        set CENSORED;
+
+        array MAvars[2014:2022] MA2014-MA2022;
+
+        last_MA_year=.;
+        do yr=2014 to 2022;
+            if MAvars[yr]=1 then last_MA_year=yr;
+        end;
+    run;
+
+    data CENSORED3;
+        set CENSORED2;
+
+        censored=0;
+
+        if not missing(last_MA_year) then do;
+            if year > last_MA_year then censored=1;
+        end;
+
+        if missing(last_MA_year) then censored=1;
+    run;
+
+    data PREPARED_DATA;
+        set CENSORED3;
+        if censored=0;
     run;
 
     /* Add covariates for rate stratification  */
@@ -3794,13 +3833,13 @@ data moud_spine_preg;
     set moud_spine_preg;
 
     /* Categorize individuals based on pregnancy and post-partum status */
-    if preg_flag=1 then group=1; /* Pregnant */
-    else if preg_flag=2 then group=2; /* 0-6 months post-partum */
-    else if preg_flag=3 then group=3; /* 7-12 months post-partum */
-    else if preg_flag=4 then group=4; /* 13-18 months post-partum */
-    else if preg_flag=5 then group=4; /* 19-24 months post-partum */
-    else if preg_flag=6 then group=5; /* >24 months post-partum */
-    else if preg_flag=9999 and has_pregnancy=1 then group=6;
+    if preg_flag=1 then group=6; /* Pregnant */
+    else if preg_flag=2 then group=5; /* 0-6 months post-partum */
+    else if preg_flag=3 then group=4; /* 7-12 months post-partum */
+    else if preg_flag=4 then group=3; /* 13-18 months post-partum */
+    else if preg_flag=5 then group=3; /* 19-24 months post-partum */
+    else if preg_flag=6 then group=2; /* >24 months post-partum */
+    else if preg_flag=9999 and has_pregnancy=1 then group=1;
     /* Pre-first pregnancy */
     else if preg_flag=9999 and has_pregnancy=0 then group=0;
     /* Never pregnant */
@@ -3808,12 +3847,12 @@ run;
 
 proc sql;
     create table moud_spine_preg as select distinct ID, month, year, max(group)
-        as group, max(moud_start_group) as moud_start_group from moud_spine_preg
-        group by ID, month, year;
+        as group, min(moud_start_group) as moud_start_group from moud_spine_preg
+        group by ID, year, month;
 quit;
 
 proc sql;
-    create table PREPARED_DATA as select a.*, coalesce(b.moud_start_group, 0) as
+    create table PREPARED_DATA as select a.*, coalesce(b.moud_start_group, 4) as
         moud_start_group, b.group as group from PREPARED_DATA a left join
         moud_spine_preg b on a.ID=b.ID and a.year=b.year and a.month=b.month;
 quit;
@@ -3909,7 +3948,7 @@ proc sql;
         calculated eligble_cessation as moud_stops_rate_lower format=8.4,
         (calculated moud_stops + 1.96 * sqrt(calculated moud_stops)) /
         calculated eligble_cessation as moud_stops_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by moud_start_group;
+        PERIOD_SUMMARY_FINAL group by moud_start_group, group;
 quit;
 
 %macro calculate_rates(group_by_vars, mytitle);
@@ -3996,58 +4035,41 @@ data PREPARED_DATA;
     set PREPARED_DATA;
     by ID year month;
 
-    retain censor_init eligible_init moud_reinit eligible_reinit
-        moud_primaryinit flag_reset_reinit;
+    retain moud_primaryinit eligible_primaryinit moud_reinit eligible_reinit;
 
     if first.ID then do;
-        eligible_init=1;
-        censor_init=0;
-        moud_reinit=0;
-        eligible_reinit=0;
+        /* eligibility state for new subject */
         moud_primaryinit=0;
-        flag_reset_reinit=0;
-    end;
-
-    /* Reset eligible_reinit if the previous month had a flagged reinitiation */
-    if flag_reset_reinit=1 then do;
+        eligible_primaryinit=1;
         eligible_reinit=0;
-        flag_reset_reinit=0; /* Reset the flag after applying */
+        moud_reinit=0;
     end;
 
-    /* Flag primary initiation only once for the first instance of moud_init = 1 */
-    if moud_init=1 and eligible_init=1 then do;
-        moud_primaryinit=1; /* Set primary initiation flag */
-        censor_init=1; /* Mark as censored after primary initiation */
+    if moud_primaryinit=1 then do;
+        eligible_primaryinit=0;
     end;
 
-    else if moud_init=0 then moud_primaryinit=0;
+    /* --- Reset per-row indicators so they don't carry forward --- */
+    moud_primaryinit=0;
+    moud_reinit=0;
 
-    if censor_init=1 and not (moud_init=1) then do;
-        eligible_init=0; /* Prevent further flagging for primary init */
-    end;
-
-    /* After moud_cessation = 1, mark as eligible for re-initiation */
-    if moud_cessation=1 then eligible_reinit=1;
-
-    /* Flag re-initiation only if eligible_reinit = 1 and moud_init = 1 occurs again */
-    if moud_init=1 and eligible_reinit=1 and moud_primaryinit=0 then do;
-        moud_reinit=1; /* Set re-initiation flag */
-        flag_reset_reinit=1; /* Set flag to reset eligible_reinit next month */
-    end;
-
-    else if moud_init=0 then moud_reinit=0;
-
-    if moud_cessation=1 and moud_reinit=1 then do;
+    /* --- PRIMARY INITIATION --- */
+    if moud_init=1 and eligible_primaryinit=1 then do;
+        moud_primaryinit=1;
         eligible_reinit=1;
-        flag_reset_reinit=0;
+    end;
+
+    /* --- RE-INITIATION EVENTS --- */
+    else if moud_init=1 and eligible_primaryinit=0 then do;
+        moud_reinit=1;
     end;
 
 run;
 
 proc sql;
     create table PERSON_TIME as select ID, group,
-        sum(eligible_init+eligible_reinit) as total_eligible_init,
-        sum(eligible_init) as eligible_init, sum(eligible_reinit) as
+        sum(eligible_primaryinit+eligible_reinit) as total_eligible_init,
+        sum(eligible_primaryinit) as eligible_init, sum(eligible_reinit) as
         eligible_reinit from PREPARED_DATA group by ID, group;
 quit;
 
@@ -4447,7 +4469,7 @@ quit;
 /* This step reduces the dataset to unique ID-month-year combinations and retains the maximum MOUD flag value for each combination. */
 proc sql;
     create table moud_summary as select distinct ID, month, year, has_pregnancy,
-        max(moud_flag) as moud_flag from moud_summary group by ID, month, year;
+        max(moud_flag) as moud_flag from moud_summary group by ID, year, month;
 quit;
 
 /*====================================================*/
@@ -4458,7 +4480,7 @@ quit;
 proc sql;
     create table moud_spine_posttxt as select distinct ID, month, year,
         max(posttxt_flag) as posttxt_flag from moud_spine_posttxt group by ID,
-        month, year;
+        year, month;
 quit;
 
 /*======================================================*/
@@ -4467,11 +4489,12 @@ quit;
 
 /* This final merge combines both the MOUD and post-treatment flags with the overdose data, ensuring that missing flags are replaced with default values (0) where applicable. */
 proc sql;
-    create table od_table_full as select a.*, coalesce(b.moud_flag, 0) as
-        moud_flag, coalesce(c.posttxt_flag, 0) as posttxt_flag from od_table a
-        left join moud_summary b on a.ID=b.ID and a.month=b.month and a.year=
-        b.year left join moud_spine_posttxt c on a.ID=c.ID and a.month=c.month
-        and a.year=c.year;
+    create table od_table_full as select a.*, coalesce(b.has_pregnancy, 0) as
+        has_pregnancy, coalesce(b.moud_flag, 0) as moud_flag,
+        coalesce(c.posttxt_flag, 0) as posttxt_flag from od_table a left join
+        moud_summary b on a.ID=b.ID and a.month=b.month and a.year=b.year left
+        join moud_spine_posttxt c on a.ID=c.ID and a.month=c.month and
+        a.year=c.year;
 quit;
 
 /*===============================*/
@@ -4487,13 +4510,14 @@ data prepared_data;
 
     time_index=(year - 2014) * 12 + month;
 
-    if preg_flag=1 then group=1; /* Pregnant */
-    else if preg_flag=2 then group=2; /* 0-6 months post-partum */
-    else if preg_flag=3 then group=3; /* 7-12 months post-partum */
-    else if preg_flag=4 then group=4; /* 13-18 months post-partum */
-    else if preg_flag=5 then group=4; /* 19-24 months post-partum */
-    else if preg_flag=6 then group=5; /* >24 months post-partum */
-    else if preg_flag=9999 and has_pregnancy=1 then group=6;
+    /* Categorize individuals based on pregnancy and post-partum status */
+    if preg_flag=1 then group=6; /* Pregnant */
+    else if preg_flag=2 then group=5; /* 0-6 months post-partum */
+    else if preg_flag=3 then group=4; /* 7-12 months post-partum */
+    else if preg_flag=4 then group=3; /* 13-18 months post-partum */
+    else if preg_flag=5 then group=3; /* 19-24 months post-partum */
+    else if preg_flag=6 then group=2; /* >24 months post-partum */
+    else if preg_flag=9999 and has_pregnancy=1 then group=1;
     /* Pre-first pregnancy */
     else if preg_flag=9999 and has_pregnancy=0 then group=0;
     /* Never pregnant */
@@ -4554,6 +4578,44 @@ data PREPARED_DATA;
         > MONTH_DEATH)) then delete;
 
     drop death_flag_forward;
+run;
+
+proc sql;
+    create table CENSORED as select a.*, b.MA2014, b.MA2015, b.MA2016, b.MA2017,
+        b.MA2018, b.MA2019, b.MA2020, b.MA2021, b.MA2022 from PREPARED_DATA as a
+        left join PHDSPINE.DEMO as b on a.ID=b.ID;
+quit;
+
+proc sort data=CENSORED;
+    by ID year month;
+run;
+
+data CENSORED2;
+    set CENSORED;
+
+    array MAvars[2014:2022] MA2014-MA2022;
+
+    last_MA_year=.;
+    do yr=2014 to 2022;
+        if MAvars[yr]=1 then last_MA_year=yr;
+    end;
+run;
+
+data CENSORED3;
+    set CENSORED2;
+
+    censored=0;
+
+    if not missing(last_MA_year) then do;
+        if year > last_MA_year then censored=1;
+    end;
+
+    if missing(last_MA_year) then censored=1;
+run;
+
+data PREPARED_DATA;
+    set CENSORED3;
+    if censored=0;
 run;
 
 /*=====================================*/
