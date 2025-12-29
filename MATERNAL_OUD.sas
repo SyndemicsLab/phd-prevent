@@ -842,11 +842,14 @@ DATA moud_demo;
     ELSE DO;
         diff_days=start_date - new_end_date;
 
-        IF diff_days <= &MOUD_leniency THEN DO;
-            new_end_date=end_date;
-            new_end_month=end_month;
-            new_end_year=end_year;
-        END;
+        if diff_days <= &MOUD_leniency then do;
+            if end_date > new_end_date then do;
+                new_end_date=end_date;
+                new_end_month=end_month;
+                new_end_year=end_year;
+            end;
+        end;
+
         ELSE DO;
             OUTPUT;
             new_start_date=start_date;
@@ -900,6 +903,31 @@ RUN;
 PROC SORT data=moud_demo;
     BY ID new_start_date;
 RUN;
+
+proc sql;
+    create table moud_demo as select a.*, min(b.new_start_date) as
+        next_start_date, min(b.new_start_month) as next_start_month,
+        min(b.new_start_year) as next_start_year from moud_demo as a left join
+        moud_demo as b on a.ID=b.ID and a.TYPE_MOUD ne b.TYPE_MOUD and
+        b.new_start_date > a.new_start_date group by a.ID, a.TYPE_MOUD,
+        a.new_start_date order by a.ID, a.new_start_date;
+quit;
+
+data moud_demo;
+    set moud_demo;
+
+    if next_start_date ne . and new_end_date > next_start_date then do;
+        new_end_date=next_start_date;
+        new_end_month=next_start_month;
+        new_end_year=next_start_year;
+    end;
+
+    drop next_start_date next_start_month next_start_year;
+run;
+
+PROC SQL;
+    CREATE TABLE moud_demo AS SELECT DISTINCT * FROM moud_demo;
+QUIT;
 
 data moud_demo;
     set moud_demo;
@@ -2982,6 +3010,32 @@ quit;
 %Table2MOUD(INSURANCE_CAT, ref='Medicaid');
 %Table2MOUD(rural_group, ref='Urban');
 
+%macro Table2MOUD(var, ref=);
+    title "Table 2, Crude";
+
+    proc glimmix data=FINAL_COHORT noclprint noitprint;
+        class &var (ref=&ref);
+        model EVER_6MO(event='1')=&var / dist=binary link=logit solution
+            oddsratio;
+    run;
+%mend;
+
+%Table2MOUD(FINAL_RE, ref='1');
+%Table2MOUD(agegrp_num, ref='3');
+%Table2MOUD(EVER_INCARCERATED, ref='0');
+%Table2MOUD(HOMELESS_HISTORY_GROUP, ref='No');
+%Table2MOUD(LANGUAGE_SPOKEN_GROUP, ref='English');
+%Table2MOUD(EDUCATION_GROUP, ref='HS or less');
+%Table2MOUD(HIV_DIAG, ref='0');
+%Table2MOUD(CONFIRMED_HCV_INDICATOR, ref='0');
+%Table2MOUD(IJI_DIAG, ref='0');
+%Table2MOUD(EVER_IDU_HCV, ref='0');
+%Table2MOUD(IDU_EVIDENCE, ref='0');
+%Table2MOUD(MENTAL_HEALTH_DIAG, ref='0');
+%Table2MOUD(OTHER_SUBSTANCE_USE, ref='0');
+%Table2MOUD(INSURANCE_CAT, ref='Medicaid');
+%Table2MOUD(rural_group, ref='Urban');
+
 proc sql;
     create table FINAL_COHORT as select FINAL_COHORT.*, (case when od.ID is not
         null then 1 else 0 end) as EVER_OD from FINAL_COHORT left join (select
@@ -3047,32 +3101,6 @@ quit;
 %Table2OD(OTHER_SUBSTANCE_USE, ref='0');
 %Table2OD(INSURANCE_CAT, ref='Medicaid');
 %Table2OD(rural_group, ref='Urban');
-
-%macro Table26MO(var, ref=);
-    title "Table 2, Crude";
-
-    proc glimmix data=FINAL_COHORT noclprint noitprint;
-        class &var (ref=&ref);
-        model EVER_6MO(event='1')=&var / dist=binary link=logit solution
-            oddsratio;
-    run;
-%mend;
-
-%Table26MO(FINAL_RE, ref='1');
-%Table26MO(agegrp_num, ref='3');
-%Table26MO(EVER_INCARCERATED, ref='0');
-%Table26MO(HOMELESS_HISTORY_GROUP, ref='No');
-%Table26MO(LANGUAGE_SPOKEN_GROUP, ref='English');
-%Table26MO(EDUCATION_GROUP, ref='HS or less');
-%Table26MO(HIV_DIAG, ref='0');
-%Table26MO(CONFIRMED_HCV_INDICATOR, ref='0');
-%Table26MO(IJI_DIAG, ref='0');
-%Table26MO(EVER_IDU_HCV, ref='0');
-%Table26MO(IDU_EVIDENCE, ref='0');
-%Table26MO(MENTAL_HEALTH_DIAG, ref='0');
-%Table26MO(OTHER_SUBSTANCE_USE, ref='0');
-%Table26MO(INSURANCE_CAT, ref='Medicaid');
-%Table26MO(rural_group, ref='Urban');
 
 PROC SQL;
     SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
@@ -3420,36 +3448,30 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
 
     data moud_spine_preg;
         set moud_table;
-        by episode_id year month;
+        by ID episode_id year month;
+        retain moud_start_group;
 
-        moud_start_month_year=mdy(new_start_month, 1, new_start_year);
-        pregnancy_start_month_year=mdy(pregnancy_start_month, 1,
-            pregnancy_start_year);
-        first_preg_start_month_year=mdy(first_preg_month, 1, first_preg_year);
+        if first.episode_id then moud_start_group=.;
 
-        if first.episode_id then do;
-            if moud_init ne 1 then moud_start_group=.;
-        end;
+        /* Only classify MOUD initiations for people with a pregnancy */
+        if moud_init=1 and has_pregnancy=1 then do;
 
-        if moud_init=1 then do;
-            if missing(pregnancy_start_month_year) and has_pregnancy=1 then do;
-                pregnancy_start_month_year=first_preg_start_month_year;
+            if preg_flag=9999 then do;
+                /* Before first pregnancy */
+                moud_start_group=1;
             end;
-
-            if moud_start_month_year < pregnancy_start_month_year then
-                moud_start_group=1; /* MOUD initiation before pregnancy */
-            else if preg_flag=1 then moud_start_group=2;
-            /* MOUD initiation during pregnancy */
-            else if moud_start_month_year > pregnancy_start_month_year and
-                preg_flag ne 1 then moud_start_group=3;
-            /* MOUD initiation after pregnancy */
-            else moud_start_group=.;
+            else if preg_flag=1 then do;
+                /* During pregnancy */
+                moud_start_group=2;
+            end;
+            else if preg_flag in (2,3,4,5,6) then do;
+                /* After pregnancy */
+                moud_start_group=3;
+            end;
         end;
-        else moud_start_group=.;
 
-        keep episode_id ID year month moud_init preg_flag moud_start_group
-            pregnancy_start_month pregnancy_start_year has_pregnancy
-            first_preg_month first_preg_year;
+        keep episode_id ID year month moud_init preg_flag has_pregnancy
+            moud_start_group;
     run;
 
     proc sort data=moud_table;
@@ -3769,9 +3791,10 @@ title 'Moud Cessation, Overall';
 
 proc sql;
     select sum(moud_stops) as moud_stops, sum(eligble_cessation) as
-        eligble_cessation from PERIOD_SUMMARY_FINAL quit;
+        eligble_cessation from PERIOD_SUMMARY_FINAL;
+quit;
 
-    title 'Moud Cessation by Pregnancy Group, Overall';
+title 'Moud Cessation by Pregnancy Group, Overall';
 
 proc sql;
     select group, count(*) as total_n, sum(moud_stops) as moud_stops,
@@ -3846,16 +3869,61 @@ data moud_spine_preg;
 run;
 
 proc sql;
-    create table moud_spine_preg as select distinct ID, month, year, max(group)
-        as group, min(moud_start_group) as moud_start_group from moud_spine_preg
-        group by ID, year, month;
+    create table collapsed as select ID, year, month, max(preg_flag) as
+        preg_flag, max(has_pregnancy) as has_pregnancy, max(group) as group,
+        max(moud_init) as moud_init,
+        /* if multiple moud_init = 1 in a month, take the first moud_start_group observed */
+        min(case when moud_init=1 then moud_start_group else . end) as
+        moud_start_group from moud_spine_preg group by ID, year, month order by
+        ID, year, month;
 quit;
 
 proc sql;
-    create table PREPARED_DATA as select a.*, coalesce(b.moud_start_group, 4) as
-        moud_start_group, b.group as group from PREPARED_DATA a left join
-        moud_spine_preg b on a.ID=b.ID and a.year=b.year and a.month=b.month;
+    create table PREPARED_DATA as select a.*, b.moud_start_group, b.group as
+        group from PREPARED_DATA a left join collapsed b on a.ID=b.ID and a.year
+        =b.year and a.month=b.month;
 quit;
+
+data PREPARED_DATA;
+    set PREPARED_DATA;
+    by ID year month;
+
+    retain moud_start_group_cf pending_moud_start_group;
+
+    /* Reset at new person */
+    if first.ID then do;
+        moud_start_group_cf=.;
+        pending_moud_start_group=.;
+    end;
+
+    /* If both happen in same month, queue initiation */
+    /* Only queue if there is a previous episode to carry forward */
+    if moud_init=1 and moud_cessation=1 then do;
+        if not missing(moud_start_group_cf) then pending_moud_start_group=
+            moud_start_group;
+        else moud_start_group_cf=moud_start_group;
+        /* first-ever episode, assign immediately */
+    end;
+
+    /* Normal initiation (no cessation this month) */
+    else if moud_init=1 then moud_start_group_cf=moud_start_group;
+
+    /* Assign carried-forward value for this month */
+    moud_start_group=moud_start_group_cf;
+
+    /* Apply cessation AFTER assignment */
+    if moud_cessation=1 then do;
+        moud_start_group_cf=.;
+
+        /* Promote queued initiation for next month */
+        if not missing(pending_moud_start_group) then do;
+            moud_start_group_cf=pending_moud_start_group;
+            pending_moud_start_group=.;
+        end;
+    end;
+
+    drop moud_start_group_cf pending_moud_start_group;
+run;
 
 proc sql;
     create table PERSON_TIME as select ID, moud_start_group, group, sum(case
@@ -3870,16 +3938,16 @@ proc sql;
 quit;
 
 proc sort data=PERSON_TIME;
-    by ID moud_start_group;
+    by ID moud_start_group group;
 run;
 
 proc sort data=PERIOD_SUMMARY;
-    by ID moud_start_group;
+    by ID moud_start_group group;
 run;
 
 data PERIOD_SUMMARY_FINAL;
     merge PERIOD_SUMMARY PERSON_TIME;
-    by ID moud_start_group;
+    by ID moud_start_group group;
 run;
 
 PROC SQL;
@@ -3901,11 +3969,6 @@ proc sql;
     create table PERIOD_SUMMARY_FINAL as select a.*, b.BIRTH_INDICATOR from
         PERIOD_SUMMARY_FINAL a left join births b on a.ID=b.ID;
 quit;
-
-PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT DISTINCT * FROM
-        PERIOD_SUMMARY_FINAL WHERE BIRTH_INDICATOR=1;
-QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     length HOMELESS_HISTORY_GROUP $10;
@@ -4038,29 +4101,31 @@ data PREPARED_DATA;
     retain moud_primaryinit eligible_primaryinit moud_reinit eligible_reinit;
 
     if first.ID then do;
-        /* eligibility state for new subject */
         moud_primaryinit=0;
-        eligible_primaryinit=1;
-        eligible_reinit=0;
         moud_reinit=0;
+        eligible_primaryinit=1; /* eligible at start */
+        eligible_reinit=0;
     end;
 
-    if moud_primaryinit=1 then do;
-        eligible_primaryinit=0;
-    end;
+    /* --- Update eligibility AFTER row processing --- */
+    if moud_primaryinit=1 then eligible_primaryinit=0;
+    if moud_reinit=1 then eligible_reinit=0;
 
-    /* --- Reset per-row indicators so they don't carry forward --- */
+    /* --- Reset per-row indicators (but NOT eligibility) --- */
     moud_primaryinit=0;
     moud_reinit=0;
+
+    /* --- Update re-init eligibility based on cessation FIRST --- */
+    if moud_cessation=1 then eligible_reinit=1;
 
     /* --- PRIMARY INITIATION --- */
     if moud_init=1 and eligible_primaryinit=1 then do;
         moud_primaryinit=1;
-        eligible_reinit=1;
     end;
 
     /* --- RE-INITIATION EVENTS --- */
-    else if moud_init=1 and eligible_primaryinit=0 then do;
+    else if moud_init=1 and eligible_primaryinit=0 and eligible_reinit=1 then
+        do;
         moud_reinit=1;
     end;
 
