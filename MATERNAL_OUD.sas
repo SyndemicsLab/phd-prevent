@@ -3416,17 +3416,17 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
     run;
 
     proc sort data=moud_summary;
-        by episode_id year month;
+        by ID episode_num year month;
     run;
 
     /* Create moud initiation flag */
     data moud_table;
         set moud_summary;
-        by episode_id year month;
+        by ID episode_num year month;
 
         retain moud_init lag_moud_flag;
 
-        if first.episode_id then do;
+        if first.ID then do;
             moud_init=0;
             lag_moud_flag=.;
         end;
@@ -3443,15 +3443,15 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
     run;
 
     proc sort data=moud_table;
-        by episode_id year month;
+        by ID episode_num year month;
     run;
 
     data moud_spine_preg;
         set moud_table;
-        by ID episode_id year month;
+        by ID episode_num year month;
         retain moud_start_group;
 
-        if first.episode_id then moud_start_group=.;
+        if first.ID then moud_start_group=.;
 
         /* Only classify MOUD initiations for people with a pregnancy */
         if moud_init=1 and has_pregnancy=1 then do;
@@ -3470,8 +3470,8 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
             end;
         end;
 
-        keep episode_id ID year month moud_init preg_flag has_pregnancy
-            moud_start_group;
+        keep episode_num episode_id ID year month moud_init preg_flag
+            has_pregnancy moud_start_group;
     run;
 
     proc sort data=moud_table;
@@ -3515,34 +3515,6 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         else moud_cessation=0;
     run;
 
-    proc sort data=moud_table;
-        by episode_id year month;
-    run;
-
-    data check_overlap;
-        set moud_table;
-        by episode_id year month;
-
-        retain ongoing_episode count;
-
-        if first.episode_id then ongoing_episode=0;
-
-        if moud_init=1 then do;
-            if ongoing_episode=1 then count + 1;
-            ongoing_episode=1;
-        end;
-
-        if moud_cessation=1 then ongoing_episode=0;
-
-    run;
-
-    title "Check Overlap in MOUD starts";
-
-    proc means data=check_overlap max;
-        var count;
-    run;
-    title;
-
     data prepared_data;
         set moud_table;
         drop episode_id;
@@ -3575,6 +3547,10 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
             moud_cessation, min(preg_flag) as preg_flag from PREPARED_DATA group
             by ID, year, month;
     quit;
+
+    proc sort data=PREPARED_DATA;
+        BY ID year month;
+    run;
 
     /* Censor on death and assess event temporality with regard to death date (i.e. claims processed after death)  */
     proc sql;
@@ -4344,11 +4320,10 @@ DATA overdose;
 
     episode_id=catx("_", ID, episode_num);
 
-    drop episode_num;
 RUN;
 
 PROC SORT data=overdose;
-    BY EPISODE_ID;
+    BY ID episode_num;
 RUN;
 
 /*==========================*/
