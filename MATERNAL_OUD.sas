@@ -1,21 +1,21 @@
 /*==============================================*/
 /* Project: PHD Maternal OUD Analysis    	    */
-/* Author: Ryan O'Dea and Sarah Munroe          */
+/* Author: Ryan O'Dea AND Sarah Munroe          */
 /* Created: 4/27/2023 		                    */
 /* Updated: 03/2025 by SJM  	                */
 /*==============================================*/
 /*	Project Goal:
-Characterize a cohort of reproductive age women with OUD and Hepatitis C
-Describe MOUD and overdose epiosdes by pregnancy status, race/ethnictiy, and age of OUD diagnosis
-Calculate rates of MOUD initaiton and cesation and fatal and non-fatal overdoses by pregnancy status, important covariate strata and temporality re: MOUD initation and cesssation
+Characterize a cohort of reproductive age women with OUD AND Hepatitis C
+Describe MOUD AND overdose epiosdes by pregnancy status, race/ethnictiy, AND age of OUD diagnosis
+Calculate rates of MOUD initaiton AND cesation AND fatal AND non-fatal overdoses by pregnancy status, important covariate strata AND temporality re: MOUD initation AND cesssation
 
 Part 1: Construct OUD cohort
-Part 2: Summary Stats: MOUD and Overdoses
+Part 2: Summary Stats: MOUD AND Overdoses
 Part 3: Table 1
 Part 4: Calculate MOUD Rates
 Part 5: Calculate Overdose Rates
 
-Detailed documentation of all datasets and variables:
+Detailed documentation of all datasets AND variables:
 https://www.mass.gov/info-details/public-health-data-warehouse-phd-technical-documentation */
 /*===== SUPRESSION CODE =========*/
 ods path(prepend) DPH.template(READ) SASUSER.TEMPLAT (READ);
@@ -26,7 +26,7 @@ run ;
 
 proc template;
     %include "/sas/data/DPH/OPH/PHD/template.sas";
-run;
+RUN;
 /*==============================*/
 /*==============================*/
 /*  	GLOBAL VARIABLES   	    */
@@ -96,57 +96,64 @@ PROC FORMAT;
 
     %LET bsas_drugs=(5,6,7,21,22,23,24,26);
 
-proc sql;
-    create table bupndcf as select distinct ndc from PHDPMP.PMP where
+PROC SQL;
+    CREATE TABLE bupndcf AS
+    SELECT DISTINCT ndc
+    FROM PHDPMP.PMP
+    WHERE
         BUP_CAT_PMP=1;
-quit;
+QUIT;
 
-proc sql noprint;
-    select quote(trim(ndc),"'") into :BUP_NDC separated by ',' from bupndcf;
-quit;
+PROC SQL noprint;
+    SELECT quote(trim(ndc),"'") INTO :BUP_NDC separated BY ','
+    FROM bupndcf;
+QUIT;
 
 /*============================ */
 /*  Part 1: Construct OUD cohort */
 /*============================ */
-/*	Overall, the logic behind the known capture is fairly simple:
-search through individual databases and flag if an ICD9, ICD10,
-CPT, NDC, or other specialized code matches our lookup table.
-If a record has one of these codes, it is 'flagged' for OUD.
+/*	Overall, the logic behind the known capture IS fairly simple:
+search through individual databases AND flag if an ICD9, ICD10,
+CPT, NDC, OR other specialized code matches our lookup table.
+If a record has one of these codes, it IS 'flagged' for OUD.
 The utilized databases are then joined onto the SPINE demographics
-dataset and if the sum of flags is greater than zero, then the
-record is flagged with OUD.
-At current iteration, data being pulled through this method is
-stratified by Year (or Year and Month), Race, Sex, and Age
-(where age groups are defined in the table below). */
+dataset AND if the SUM of flags IS greater than zero, then the
+record IS flagged with OUD.
+At current iteration, data being pulled through this method IS
+stratified by Year (OR Year AND Month), Race, Sex, AND Age
+(where age groups are defined IN the table below). */
 /*====================*/
 /* 1. Demographics    */
 /*====================*/
 
 /* Using data from DEMO, take the cartesian coordinate of years
-(as defined above) and months 1:12 to construct a shell table */
+(AS defined above) AND months 1:12 to construct a shell table */
 PROC SQL;
-    CREATE TABLE demographics AS SELECT DISTINCT ID, FINAL_RE, YOB, FINAL_SEX,
-        SELF_FUNDED FROM PHDSPINE.DEMO WHERE FINAL_SEX=2 & SELF_FUNDED=0;
+    CREATE TABLE demographics AS
+    SELECT 
+        DISTINCT ID, FINAL_RE, YOB, FINAL_SEX, SELF_FUNDED
+    FROM PHDSPINE.DEMO
+    WHERE FINAL_SEX=2 AND SELF_FUNDED=0;
 QUIT;
 
 /*====================*/
 /* 2. APCD            */
 /*====================*/
 
-/* The APCD consists of the Medical and Pharmacy Claims datasets and,
+/* The APCD consists of the Medical AND Pharmacy Claims datasets AND,
 along with Casemix, are the datasets where we primarily search along
 our ICD code list. We construct a variable named `OUD_APCD` within our
 APCD Medical dataset using `MED_ICD1-25`, `MED_PROC1-7`, `MED_ECODE`, `MED_ADM_DIAGNOSIS`
-and `MED_DIS_DIAGNOSIS`. We preform a rowwise search and add one to a
+AND `MED_DIS_DIAGNOSIS`. We preform a rowwise search AND add one to a
 temporary `count` variable if they appear within our ICD code list.
-At the end, if the `count` variable is strictly greater than one
-then our `OUD_APCD` flag is set to 1.
+At the end, if the `count` variable IS strictly greater than one
+then our `OUD_APCD` flag IS set to 1.
 
 The APCD medical dataset does not hold variables for searching
-for NDC Codes, so we add in the APCD pharmacy dataset with
+for NDC Codes, so we add IN the APCD pharmacy dataset with
 `PHARM_NDC` to search for applicable NDC codes.
-If `PHARM_NDC` or `PHARM_ICD` is within our OUD Codes lists above,
-then our `OUD_PHARM` flag is set to 1.*/
+If `PHARM_NDC` OR `PHARM_ICD` IS within our OUD Codes lists above,
+then our `OUD_PHARM` flag IS set to 1.*/
 DATA apcd (KEEP=ID oud_apcd year_apcd month_apcd);
     SET PHDAPCD.MOUD_MEDICAL (KEEP=ID MED_ECODE MED_ADM_DIAGNOSIS MED_AGE
         MED_ICD_PROC1-MED_ICD_PROC7 MED_ICD1-MED_ICD25 MED_FROM_DATE_YEAR
@@ -179,10 +186,17 @@ DATA apcd (KEEP=ID oud_apcd year_apcd month_apcd);
 RUN;
 
 PROC SQL;
-    CREATE TABLE apcd AS SELECT a.ID, a.year_apcd, a.month_apcd, MAX(a.oud_apcd)
-        AS oud_apcd FROM apcd a INNER JOIN (SELECT ID, MIN(year_apcd) AS
-        year_apcd FROM apcd GROUP BY ID) b ON a.ID=b.ID AND a.year_apcd=
-        b.year_apcd GROUP BY a.ID, a.year_apcd, a.month_apcd;
+    CREATE TABLE apcd AS
+    SELECT 
+        a.ID, a.year_apcd, a.month_apcd, MAX(a.oud_apcd) AS oud_apcd
+    FROM apcd a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_apcd) AS year_apcd
+    FROM apcd
+    GROUP BY ID) AS b 
+        ON a.ID=b.ID AND a.year_apcd=b.year_apcd
+    GROUP BY a.ID, a.year_apcd, a.month_apcd;
 QUIT;
 
 DATA pharm (KEEP=oud_pharm ID year_pharm month_pharm);
@@ -199,10 +213,17 @@ DATA pharm (KEEP=oud_pharm ID year_pharm month_pharm);
 RUN;
 
 PROC SQL;
-    CREATE TABLE pharm AS SELECT a.ID, a.year_pharm, a.month_pharm,
-        MAX(a.oud_pharm) AS oud_pharm FROM pharm a INNER JOIN (SELECT ID,
-        MIN(year_pharm) AS year_pharm FROM pharm GROUP BY ID) b ON a.ID=b.ID AND
-        a.year_pharm=b.year_pharm GROUP BY a.ID, a.year_pharm, a.month_pharm;
+    CREATE TABLE pharm AS
+    SELECT 
+        a.ID, a.year_pharm, a.month_pharm, MAX(a.oud_pharm) AS oud_pharm
+    FROM pharm a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_pharm) AS year_pharm
+    FROM pharm
+    GROUP BY ID) AS b
+        ON a.ID=b.ID AND a.year_pharm=b.year_pharm
+    GROUP BY a.ID, a.year_pharm, a.month_pharm;
 QUIT;
 
 /*====================*/
@@ -210,53 +231,53 @@ QUIT;
 /*====================*/
 /* ### Emergency Department
 Casemix.ED (Emergency Department) has three smaller internally
-linked tables: ED, ED_DIAG, and ED_PROC; all linked together by
-their internal `ED_ID`, which is only found in the ED tables
-and should not be linked back to the PHD ID.
-1. ED: Within the ED Dataset, we are interested in if `ED_DIAG1`
-or `ED_PRINCIPLE_ECODE` are within our OUD Code list.
-A temporary variable `OUD_ED_RAW` is created as a flag.
+linked tables: ED, ED_DIAG, AND ED_PROC; all linked together by
+their internal `ED_ID`, which IS only found IN the ED tables
+AND should not be linked back to the PHD ID.
+1. ED: Within the ED Dataset, we are interested IN if `ED_DIAG1`
+OR `ED_PRINCIPLE_ECODE` are within our OUD Code list.
+A temporary variable `OUD_ED_RAW` IS created AS a flag.
 2. ED_DIAG: Within the ED_DIAG Dataset, we construct our flag,
 `OUD_ED_DIAG` from the variable `ED_DIAG`
 3. ED_PROC: Within the ED_PROC Dataset, we construct our flag,
 `OUD_ED_PROC` from the variable `ED_PROC`
-4. Datasets ED, ED_DIAG, and ED_PROC and joined along
-their internal `ED_ID`. If the sum of created flags is
+4. Datasets ED, ED_DIAG, AND ED_PROC AND joined along
+their internal `ED_ID`. If the SUM of created flags IS
 strictly greater than zero, then the overall `OUD_CM_ED`
-flag is set to 1.
+flag IS set to 1.
 
 ### Hospital Inpatient Discharge
 Casemix.HD (Hospital Inpatient Discharge) follows the same pattern
-as ED and has three smaller internally linked tables: HD, HD_DIAG,
-and HD_PROC; all linked together by their internal `HD_ID`,
-which is only found in the HD tables and should not be linked
+AS ED AND has three smaller internally linked tables: HD, HD_DIAG,
+AND HD_PROC; all linked together by their internal `HD_ID`,
+which IS only found IN the HD tables AND should not be linked
 back to the PHD ID.
-1. HD: Within the HD Dataset, we are intersted in if `HD_PROC1` or
+1. HD: Within the HD Dataset, we are intersted IN if `HD_PROC1` OR
 `HD_DIAG1` are within our OUD Code list. A temporary variable
-`OUD_HD_RAW` is created as a flag.
+`OUD_HD_RAW` IS created AS a flag.
 2. HD_DIAG: Within the HD_DIAG Dataset, we construct our flag,
 `OUD_HD_DIAG` from the variable `HD_DIAG`
 3. HD_PROC: Within the HD_PROC Dataset, we construct our flag,
 `OUD_HD_PROC` from the variable `HD_PROC`
-4. Datasets HD, HD_DIAG, and HD_PROC and joined along their
-internal `HD_ID`. If the sum of created flags is strictly
-greater than zero, then the overall `OUD_CM_HD` flag is set to 1.
+4. Datasets HD, HD_DIAG, AND HD_PROC AND joined along their
+internal `HD_ID`. If the SUM of created flags IS strictly
+greater than zero, then the overall `OUD_CM_HD` flag IS set to 1.
 
 ### Outpatient Observations
 Casemix.OO (Outpatient Observations) breaks from the previous
-pattern of HD and ED by only have one attributing table.
+pattern of HD AND ED by only have one attributing table.
 Within this table, we construct our flag `OUD_CM_OO` by searching
-through `OO_DIAG1-16`, `OO_PROC1-4`, `OO_CPT1-10`, and
-`OO_PRINCIPALEXTERNAL_CAUSECODE`. We preform a rowwise search and
+through `OO_DIAG1-16`, `OO_PROC1-4`, `OO_CPT1-10`, AND
+`OO_PRINCIPALEXTERNAL_CAUSECODE`. We preform a rowwise search AND
 add one to a temporary `count` variable if they appear within our
-code lists. At the end, if the `count` variable is strictly greater
-than one then our `OUD_CM_OO` flag is set to 1. */
+code lists. At the end, if the `count` variable IS strictly greater
+than one then our `OUD_CM_OO` flag IS set to 1. */
 
 /* ED */
 DATA casemix_ed (KEEP=ID oud_cm_ed year_cm month_cm ED_ID);
     SET PHDCM.ED (KEEP=ID ED_DIAG1 ED_PRINCIPLE_ECODE ED_ADMIT_YEAR ED_AGE ED_ID
         ED_ADMIT_MONTH WHERE=(ED_ADMIT_YEAR IN &year));
-    IF ED_DIAG1 in &ICD OR ED_PRINCIPLE_ECODE IN &ICD THEN oud_cm_ed=1;
+    IF ED_DIAG1 IN &ICD OR ED_PRINCIPLE_ECODE IN &ICD THEN oud_cm_ed=1;
     ELSE oud_cm_ed=0;
 
     IF oud_cm_ed > 0 THEN do;
@@ -268,7 +289,7 @@ RUN;
 /* ED_DIAG */
 DATA casemix_ed_diag (KEEP=oud_cm_ed_diag ED_ID);
     SET PHDCM.ED_DIAG (KEEP=ED_ID ED_DIAG);
-    IF ED_DIAG in &ICD THEN oud_cm_ed_diag=1;
+    IF ED_DIAG IN &ICD THEN oud_cm_ed_diag=1;
     ELSE oud_cm_ed_diag=0;
 
     IF oud_cm_ed_diag=0 THEN DELETE;
@@ -276,15 +297,18 @@ DATA casemix_ed_diag (KEEP=oud_cm_ed_diag ED_ID);
 RUN;
 
 PROC SQL;
-    CREATE TABLE casemix_ed_diag AS SELECT a.ID, a.ED_ID, a.ED_ADMIT_YEAR,
-        b.oud_cm_ed_diag FROM PHDCM.ED AS a RIGHT JOIN casemix_ed_diag AS b ON
-        a.ED_ID=b.ED_ID WHERE a.ED_ADMIT_YEAR IN &year;
+    CREATE TABLE casemix_ed_diag AS
+    SELECT 
+        a.ID, a.ED_ID, a.ED_ADMIT_YEAR, b.oud_cm_ed_diag
+    FROM PHDCM.ED AS a
+    RIGHT JOIN casemix_ed_diag AS b ON a.ED_ID=b.ED_ID
+    WHERE a.ED_ADMIT_YEAR IN &year;
 QUIT;
 
 /* ED_PROC */
 DATA casemix_ed_proc (KEEP=oud_cm_ed_proc ED_ID);
     SET PHDCM.ED_PROC (KEEP=ED_ID ED_PROC);
-    IF ED_PROC in &PROC THEN oud_cm_ed_proc=1;
+    IF ED_PROC IN &PROC THEN oud_cm_ed_proc=1;
     ELSE oud_cm_ed_proc=0;
 
     IF oud_cm_ed_proc=0 THEN DELETE;
@@ -292,26 +316,38 @@ DATA casemix_ed_proc (KEEP=oud_cm_ed_proc ED_ID);
 RUN;
 
 PROC SQL;
-    CREATE TABLE casemix_ed_proc AS SELECT a.ID, a.ED_ID, a.ED_ADMIT_YEAR,
-        b.oud_cm_ed_proc FROM PHDCM.ED AS a RIGHT JOIN casemix_ed_proc AS b ON
-        a.ED_ID=b.ED_ID WHERE a.ED_ADMIT_YEAR IN &year;
+    CREATE TABLE casemix_ed_proc AS
+    SELECT 
+        a.ID, a.ED_ID, a.ED_ADMIT_YEAR, b.oud_cm_ed_proc
+    FROM PHDCM.ED AS a
+    RIGHT JOIN casemix_ed_proc AS b ON a.ED_ID=b.ED_ID
+    WHERE a.ED_ADMIT_YEAR IN &year;
 QUIT;
 
 /* CASEMIX ED MERGE */
 PROC SQL;
-    CREATE TABLE pharm AS SELECT DISTINCT * FROM pharm;
-
-    CREATE TABLE casemix_ed_proc AS SELECT DISTINCT * FROM casemix_ed_proc;
-
-    CREATE TABLE apcd AS SELECT DISTINCT * FROM apcd;
-
-    CREATE TABLE casemix_ed AS SELECT DISTINCT * FROM casemix_ed;
-
-    CREATE TABLE casemix_ed_diag AS SELECT DISTINCT * FROM casemix_ed_diag;
-
-    CREATE TABLE casemix AS SELECT * FROM casemix_ed LEFT JOIN casemix_ed_diag
-        ON casemix_ed.ED_ID=casemix_ed_diag.ED_ID LEFT JOIN casemix_ed_proc ON
-        casemix_ed_diag.ED_ID=casemix_ed_proc.ED_ID;
+    CREATE TABLE pharm AS
+    SELECT DISTINCT *
+    FROM pharm;
+    CREATE TABLE casemix_ed_proc AS
+    SELECT DISTINCT *
+    FROM casemix_ed_proc;
+    CREATE TABLE apcd AS
+    SELECT DISTINCT *
+    FROM apcd;
+    CREATE TABLE casemix_ed AS
+    SELECT DISTINCT *
+    FROM casemix_ed;
+    CREATE TABLE casemix_ed_diag AS
+    SELECT DISTINCT *
+    FROM casemix_ed_diag;
+    CREATE TABLE casemix AS
+    SELECT *
+    FROM casemix_ed
+    LEFT JOIN casemix_ed_diag 
+            ON casemix_ed.ED_ID=casemix_ed_diag.ED_ID
+    LEFT JOIN casemix_ed_proc 
+            ON casemix_ed_diag.ED_ID=casemix_ed_proc.ED_ID;
 QUIT;
 
 DATA casemix (KEEP=ID oud_ed year_cm month_cm);
@@ -323,10 +359,17 @@ DATA casemix (KEEP=ID oud_ed year_cm month_cm);
 RUN;
 
 PROC SQL;
-    CREATE TABLE casemix AS SELECT a.ID, a.year_cm, a.month_cm, MAX(a.oud_ed) AS
-        oud_ed FROM casemix a INNER JOIN (SELECT ID, MIN(year_cm) AS year_cm
-        FROM casemix GROUP BY ID) b ON a.ID=b.ID AND a.year_cm=b.year_cm GROUP
-        BY a.ID, a.year_cm, a.month_cm;
+    CREATE TABLE casemix AS
+    SELECT 
+        a.ID, a.year_cm, a.month_cm, MAX(a.oud_ed) AS oud_ed
+    FROM casemix a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_cm) AS year_cm
+    FROM casemix
+    GROUP BY ID) b 
+        ON a.ID=b.ID AND a.year_cm=b.year_cm
+    GROUP BY a.ID, a.year_cm, a.month_cm;
 QUIT;
 
 /*====================*/
@@ -336,7 +379,7 @@ QUIT;
 DATA hd (KEEP=HD_ID ID oud_hd_raw year_hd month_hd);
     SET PHDCM.HD (KEEP=ID HD_DIAG1 HD_PROC1 HD_ADMIT_YEAR HD_AGE HD_ID
         HD_ADMIT_MONTH HD_ECODE WHERE=(HD_ADMIT_YEAR IN &year));
-    IF HD_DIAG1 in &ICD OR HD_PROC1 in &PROC OR HD_ECODE IN &ICD THEN oud_hd_raw
+    IF HD_DIAG1 IN &ICD OR HD_PROC1 IN &PROC OR HD_ECODE IN &ICD THEN oud_hd_raw
         =1;
     ELSE oud_hd_raw=0;
 
@@ -349,7 +392,7 @@ RUN;
 /* HD DIAG DATA */
 DATA hd_diag (KEEP=HD_ID oud_hd_diag);
     SET PHDCM.HD_DIAG (KEEP=HD_ID HD_DIAG);
-    IF HD_DIAG in &ICD THEN oud_hd_diag=1;
+    IF HD_DIAG IN &ICD THEN oud_hd_diag=1;
     ELSE oud_hd_diag=0;
 
     IF oud_hd_diag=0 THEN DELETE;
@@ -357,9 +400,12 @@ DATA hd_diag (KEEP=HD_ID oud_hd_diag);
 RUN;
 
 PROC SQL;
-    CREATE TABLE hd_diag AS SELECT a.ID, a.HD_ID, a.HD_ADMIT_YEAR, b.oud_hd_diag
-        FROM PHDCM.HD AS a RIGHT JOIN hd_diag AS b ON a.HD_ID=b.HD_ID WHERE
-        a.HD_ADMIT_YEAR IN &year;
+    CREATE TABLE hd_diag AS
+    SELECT a.ID, a.HD_ID, a.HD_ADMIT_YEAR, b.oud_hd_diag
+    FROM PHDCM.HD AS a
+    RIGHT JOIN hd_diag AS b ON a.HD_ID=b.HD_ID
+    WHERE
+            a.HD_ADMIT_YEAR IN &year;
 QUIT;
 
 /* HD PROC DATA */
@@ -373,25 +419,36 @@ DATA hd_proc(KEEP=HD_ID oud_hd_proc);
 RUN;
 
 PROC SQL;
-    CREATE TABLE hd_proc AS SELECT a.ID, a.HD_ID, a.HD_ADMIT_YEAR, b.oud_hd_proc
-        FROM PHDCM.HD AS a RIGHT JOIN hd_proc AS b ON a.HD_ID=b.HD_ID WHERE
+    CREATE TABLE hd_proc AS
+    SELECT a.ID, a.HD_ID, a.HD_ADMIT_YEAR, b.oud_hd_proc
+    FROM PHDCM.HD AS a
+    RIGHT JOIN hd_proc AS b ON a.HD_ID=b.HD_ID
+    WHERE
         a.HD_ADMIT_YEAR IN &year;
 QUIT;
 
 /* HD MERGE */
 PROC SQL;
-    CREATE TABLE pharm AS SELECT DISTINCT * FROM pharm;
-
-    CREATE TABLE hd_diag AS SELECT DISTINCT * FROM hd_diag;
-
-    CREATE TABLE casemix AS SELECT DISTINCT * FROM casemix;
-
-    CREATE TABLE hd AS SELECT DISTINCT * FROM hd;
-
-    CREATE TABLE hd_proc AS SELECT DISTINCT * FROM hd_proc;
-
-    CREATE TABLE hd AS SELECT * FROM hd LEFT JOIN hd_diag ON hd.HD_ID=
-        hd_diag.HD_ID LEFT JOIN hd_proc ON hd.HD_ID=hd_proc.HD_ID;
+    CREATE TABLE pharm AS
+    SELECT DISTINCT *
+    FROM pharm;
+    CREATE TABLE hd_diag AS
+    SELECT DISTINCT *
+    FROM hd_diag;
+    CREATE TABLE casemix AS
+    SELECT DISTINCT *
+    FROM casemix;
+    CREATE TABLE hd AS
+    SELECT DISTINCT *
+    FROM hd;
+    CREATE TABLE hd_proc AS
+    SELECT DISTINCT *
+    FROM hd_proc;
+    CREATE TABLE hd AS
+    SELECT *
+    FROM hd
+    LEFT JOIN hd_diag ON hd.HD_ID=hd_diag.HD_ID
+    LEFT JOIN hd_proc ON hd.HD_ID=hd_proc.HD_ID;
 QUIT;
 
 DATA hd (KEEP=ID oud_hd year_hd month_hd);
@@ -403,10 +460,17 @@ DATA hd (KEEP=ID oud_hd year_hd month_hd);
 RUN;
 
 PROC SQL;
-    CREATE TABLE hd AS SELECT a.ID, a.year_hd, a.month_hd, MAX(a.oud_hd) AS
-        oud_hd FROM hd a INNER JOIN (SELECT ID, MIN(year_hd) AS year_hd FROM hd
-        GROUP BY ID) b ON a.ID=b.ID AND a.year_hd=b.year_hd GROUP BY a.ID,
-        a.year_hd, a.month_hd;
+    CREATE TABLE hd AS
+    SELECT 
+        a.ID, a.year_hd, a.month_hd, MAX(a.oud_hd) AS oud_hd
+    FROM hd a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_hd) AS year_hd
+    FROM hd
+    GROUP BY ID) b 
+        ON a.ID=b.ID AND a.year_hd=b.year_hd
+    GROUP BY a.ID, a.year_hd, a.month_hd;
 QUIT;
 
 /*====================*/
@@ -441,10 +505,17 @@ DATA oo (KEEP=ID oud_oo year_oo month_oo);
 RUN;
 
 PROC SQL;
-    CREATE TABLE oo AS SELECT a.ID, a.year_oo, a.month_oo, MAX(a.oud_oo) AS
-        oud_oo FROM oo a INNER JOIN (SELECT ID, MIN(year_oo) AS year_oo FROM oo
-        GROUP BY ID) b ON a.ID=b.ID AND a.year_oo=b.year_oo GROUP BY a.ID,
-        a.year_oo, a.month_oo;
+    CREATE TABLE oo AS
+    SELECT 
+        a.ID, a.year_oo, a.month_oo, MAX(a.oud_oo) AS oud_oo
+    FROM oo a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_oo) AS year_oo
+    FROM oo
+    GROUP BY ID) b 
+        ON a.ID=b.ID AND a.year_oo=b.year_oo
+    GROUP BY a.ID, a.year_oo, a.month_oo;
 QUIT;
 
 /*====================*/
@@ -452,8 +523,11 @@ QUIT;
 
 /*====================*/
 PROC SQL;
-    CREATE TABLE casemix AS SELECT * FROM casemix FULL JOIN hd ON casemix.ID=
-        hd.ID FULL JOIN oo ON hd.ID=oo.ID;
+    CREATE TABLE casemix AS
+    SELECT *
+    FROM casemix
+    FULL JOIN hd ON casemix.ID=hd.ID
+    FULL JOIN oo ON hd.ID=oo.ID;
 QUIT;
 
 PROC STDIZE DATA=casemix OUT=casemix reponly missing=9999;
@@ -466,7 +540,7 @@ DATA casemix (KEEP=ID oud_cm year_cm month_cm);
     IF oud_hd=9999 THEN oud_hd=0;
     IF oud_oo=9999 THEN oud_oo=0;
 
-    IF sum(oud_ed, oud_hd, oud_oo) > 0 THEN oud_cm=1;
+    IF SUM(oud_ed, oud_hd, oud_oo) > 0 THEN oud_cm=1;
     ELSE oud_cm=0;
     IF oud_cm=0 THEN DELETE;
 
@@ -474,7 +548,7 @@ DATA casemix (KEEP=ID oud_cm year_cm month_cm);
     hd_date=year_hd + month_hd * 0.01;
     cm_date=year_cm + month_cm * 0.01;
 
-    min_date=min(oo_date, hd_date, cm_date);
+    min_date=MIN(oo_date, hd_date, cm_date);
 
     year_cm=floor(min_date);
     month_cm=round((min_date - year_cm) * 100);
@@ -487,8 +561,8 @@ RUN;
 /* Like Matris, the BSAS dataset involves some PHD level encoding.
 We tag a record with our flag, `OUD_BSAS`, if
 `CLT_ENR_PRIMARY_DRUG`, `CLT_ENR_SECONDARY_DRUG`,
-`CLT_ENR_TERTIARY_DRUG` are in the encoded list: (5,6,7,21,22,23,24,26)
-or if `PHD_PRV_SERV_CAT = 7` (Opioid Treatment).
+`CLT_ENR_TERTIARY_DRUG` are IN the encoded list: (5,6,7,21,22,23,24,26)
+OR if `PHD_PRV_SERV_CAT = 7` (Opioid Treatment).
 
 Descriptions of the BSAS drugs respective to
 PHD level documentation
@@ -505,8 +579,8 @@ DATA bsas (KEEP=ID oud_bsas year_bsas month_bsas);
         CLT_ENR_SECONDARY_DRUG CLT_ENR_TERTIARY_DRUG PDM_PRV_SERV_CAT
         ENR_YEAR_BSAS ENR_MONTH_BSAS AGE_BSAS WHERE=(ENR_YEAR_BSAS IN &year));
     IF (CLT_ENR_OVERDOSES_LIFE > 0 AND CLT_ENR_OVERDOSES_LIFE ^= 999) OR
-        CLT_ENR_PRIMARY_DRUG in &bsas_drugs OR CLT_ENR_SECONDARY_DRUG in
-        &bsas_drugs OR CLT_ENR_TERTIARY_DRUG in &bsas_drugs OR PDM_PRV_SERV_CAT=
+        CLT_ENR_PRIMARY_DRUG IN &bsas_drugs OR CLT_ENR_SECONDARY_DRUG IN
+        &bsas_drugs OR CLT_ENR_TERTIARY_DRUG IN &bsas_drugs OR PDM_PRV_SERV_CAT=
         7 THEN oud_bsas=1;
     ELSE oud_bsas=0;
     IF oud_bsas=0 THEN DELETE;
@@ -517,24 +591,31 @@ DATA bsas (KEEP=ID oud_bsas year_bsas month_bsas);
 RUN;
 
 PROC SQL;
-    CREATE TABLE bsas AS SELECT a.ID, a.year_bsas, a.month_bsas, MAX(a.oud_bsas)
-        AS oud_bsas FROM bsas a INNER JOIN (SELECT ID, MIN(year_bsas) AS
-        year_bsas FROM bsas GROUP BY ID) b ON a.ID=b.ID AND a.year_bsas=
-        b.year_bsas GROUP BY a.ID, a.year_bsas, a.month_bsas;
+    CREATE TABLE bsas AS
+    SELECT a.ID, a.year_bsas, a.month_bsas, MAX(a.oud_bsas)
+        AS oud_bsas
+    FROM bsas a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_bsas) AS year_bsas
+    FROM bsas
+    GROUP BY ID) b 
+        ON a.ID=b.ID AND a.year_bsas=b.year_bsas
+    GROUP BY a.ID, a.year_bsas, a.month_bsas;
 QUIT;
 
 /*====================*/
 /* 8. MATRIS          */
 /*====================*/
 
-/* The MATRIS Dataset depends on PHD level encoding of variables
-`OPIOID_ORI_MATRIS` and `OPIOID_ORISUBCAT_MATRIS` to
+/* The MATRIS Dataset depends ON PHD level encoding of variables
+`OPIOID_ORI_MATRIS` AND `OPIOID_ORISUBCAT_MATRIS` to
 construct our flag variable, `OUD_MATRIS`. */
 DATA matris (KEEP=ID oud_matris year_matris month_matris);
     SET PHDEMS.MATRIS (KEEP=ID OPIOID_ORI_MATRIS OPIOID_ORISUBCAT_MATRIS
         inc_year_matris inc_month_matris AGE_MATRIS AGE_UNITS_MATRIS WHERE=
         (inc_year_matris IN &year));
-    IF OPIOID_ORI_MATRIS=1 OR OPIOID_ORISUBCAT_MATRIS in (1:5) THEN oud_matris=
+    IF OPIOID_ORI_MATRIS=1 OR OPIOID_ORISUBCAT_MATRIS IN (1:5) THEN oud_matris=
         1;
     ELSE oud_matris=0;
     IF oud_matris=0 THEN DELETE;
@@ -545,21 +626,27 @@ DATA matris (KEEP=ID oud_matris year_matris month_matris);
 RUN;
 
 PROC SQL;
-    CREATE TABLE matris AS SELECT a.ID, a.year_matris, a.month_matris,
-        MAX(a.oud_matris) AS oud_matris FROM matris a INNER JOIN (SELECT ID,
-        MIN(year_matris) AS year_matris FROM matris GROUP BY ID) b ON a.ID=b.ID
-        AND a.year_matris=b.year_matris GROUP BY a.ID, a.year_matris,
-        a.month_matris;
+    CREATE TABLE matris AS
+    SELECT 
+        a.ID, a.year_matris, a.month_matris, MAX(a.oud_matris) AS oud_matris
+    FROM matris a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_matris) AS year_matris
+    FROM matris
+    GROUP BY ID) b
+        ON a.ID=b.ID AND a.year_matris=b.year_matris
+    GROUP BY a.ID, a.year_matris, a.month_matris;
 QUIT;
 
 /*====================*/
 /* 9. DEATH           */
 /*====================*/
 
-/* The Death dataset holds the official cause and manner of
-death assigned by physicians and medical examiners. For our
-purposes, we are only interested in the variable `OPIOID_DEATH`
-which is based on 'ICD10 codes or literal search' from other
+/* The Death dataset holds the official cause AND manner of
+death assigned by physicians AND medical examiners. For our
+purposes, we are only interested IN the variable `OPIOID_DEATH`
+which IS based ON 'ICD10 codes OR literal search' from other
 PHD sources.*/
 DATA death (KEEP=ID oud_death year_death month_death);
     SET PHDDEATH.DEATH (KEEP=ID OPIOID_DEATH YEAR_DEATH MONTH_DEATH AGE_DEATH
@@ -574,10 +661,17 @@ DATA death (KEEP=ID oud_death year_death month_death);
 RUN;
 
 PROC SQL;
-    CREATE TABLE death AS SELECT a.ID, a.year_death, a.month_death,
-        MAX(a.oud_death) AS oud_death FROM death a INNER JOIN (SELECT ID,
-        MIN(year_death) AS year_death FROM death GROUP BY ID) b ON a.ID=b.ID AND
-        a.year_death=b.year_death GROUP BY a.ID, a.year_death, a.month_death;
+    CREATE TABLE death AS
+    SELECT 
+        a.ID, a.year_death, a.month_death, MAX(a.oud_death) AS oud_death
+    FROM death a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_death) AS year_death
+    FROM death
+    GROUP BY ID) b 
+        ON a.ID=b.ID AND a.year_death=b.year_death
+    GROUP BY a.ID, a.year_death, a.month_death;
 QUIT;
 
 /*====================*/
@@ -585,7 +679,7 @@ QUIT;
 /*====================*/
 
 /* Within the PMP dataset, we only use the `BUPRENORPHINE_PMP`
-to define the flag `OUD_PMP` - conditioned on BUP_CAT_PMP = 1. */
+to define the flag `OUD_PMP` - conditioned ON BUP_CAT_PMP = 1. */
 DATA pmp (KEEP=ID oud_pmp year_pmp month_pmp);
     SET PHDPMP.PMP (KEEP=ID BUPRENORPHINE_PMP date_filled_year AGE_PMP
         date_filled_month BUP_CAT_PMP WHERE=(date_filled_year IN &year));
@@ -599,10 +693,17 @@ DATA pmp (KEEP=ID oud_pmp year_pmp month_pmp);
 RUN;
 
 PROC SQL;
-    CREATE TABLE pmp AS SELECT a.ID, a.year_pmp, a.month_pmp, MAX(a.oud_pmp) AS
-        oud_pmp FROM pmp a INNER JOIN (SELECT ID, MIN(year_pmp) AS year_pmp FROM
-        pmp GROUP BY ID) b ON a.ID=b.ID AND a.year_pmp=b.year_pmp GROUP BY a.ID,
-        a.year_pmp, a.month_pmp;
+    CREATE TABLE pmp AS
+    SELECT 
+        a.ID, a.year_pmp, a.month_pmp, MAX(a.oud_pmp) AS oud_pmp
+    FROM pmp a
+    INNER JOIN 
+        (
+    SELECT ID, MIN(year_pmp) AS year_pmp
+    FROM pmp
+    GROUP BY ID) b 
+        ON a.ID=b.ID AND a.year_pmp=b.year_pmp
+    GROUP BY a.ID, a.year_pmp, a.month_pmp;
 QUIT;
 
 DATA pmp;
@@ -617,35 +718,45 @@ RUN;
 
 /* As a final series of steps:
 1. APCD-Pharm, APCD-Medical, Casemix, Death, PMP, Matris,
-BSAS are joined together on the cartesian coordinate of Months
-(1:12), Year (2015:2022), and SPINE (Race, Sex, ID)
-2. The sum of the fabricated flags is taken. If the sum is strictly
-greater than zero, then the master flag is set to 1.
+BSAS are joined together ON the cartesian coordinate of Months
+(1:12), Year (2015:2022), AND SPINE (Race, Sex, ID)
+2. The SUM of the fabricated flags IS taken. If the SUM IS strictly
+greater than zero, then the master flag IS set to 1.
 Zeros are deleted
-4. We select distinct ID, Age Bins, Race, Year, and Month and
+4. We select DISTINCT ID, Age Bins, Race, Year, AND Month AND
 output the count of those detected with OUD
-5. Any count that is between 1 and 10 are suppressed and set to -1,
+5. Any count that IS between 1 AND 10 are suppressed AND set to -1,
 any zeros are true zeros */
 PROC SQL;
-    CREATE TABLE oo AS SELECT DISTINCT * FROM oo;
-
-    CREATE TABLE bsas AS SELECT DISTINCT * FROM bsas;
-
-    CREATE TABLE matris AS SELECT DISTINCT * FROM matris;
-
-    CREATE TABLE death AS SELECT DISTINCT * FROM death;
-
-    CREATE TABLE pmp AS SELECT DISTINCT * FROM pmp;
-
+    CREATE TABLE oo AS
+    SELECT DISTINCT *
+    FROM oo;
+    CREATE TABLE bsas AS
+    SELECT DISTINCT *
+    FROM bsas;
+    CREATE TABLE matris AS
+    SELECT DISTINCT *
+    FROM matris;
+    CREATE TABLE death AS
+    SELECT DISTINCT *
+    FROM death;
+    CREATE TABLE pmp AS
+    SELECT DISTINCT *
+    FROM pmp;
 PROC SQL;
-    CREATE TABLE oud AS SELECT * FROM demographics LEFT JOIN apcd ON apcd.ID=
-        demographics.ID LEFT JOIN casemix ON casemix.ID=demographics.ID LEFT
-        JOIN death ON death.ID=demographics.ID LEFT JOIN bsas ON bsas.ID=
-        demographics.ID LEFT JOIN matris ON matris.ID=demographics.ID LEFT JOIN
-        pmp ON pmp.ID=demographics.ID LEFT JOIN pharm ON pharm.ID=
-        demographics.ID;
-
-    CREATE TABLE oud AS SELECT DISTINCT * FROM oud;
+    CREATE TABLE oud AS
+    SELECT *
+    FROM demographics
+    LEFT JOIN apcd ON apcd.ID=demographics.ID
+    LEFT JOIN casemix ON casemix.ID=demographics.ID
+    LEFT JOIN death ON death.ID=demographics.ID
+    LEFT JOIN bsas ON bsas.ID=demographics.ID
+    LEFT JOIN matris ON matris.ID=demographics.ID
+    LEFT JOIN pmp ON pmp.ID=demographics.ID
+    LEFT JOIN pharm ON pharm.ID=demographics.ID;
+    CREATE TABLE oud AS
+    SELECT DISTINCT *
+    FROM oud;
 QUIT;
 
 PROC STDIZE DATA=oud OUT=oud reponly missing=9999;
@@ -661,7 +772,7 @@ DATA oud;
         IF oud_flags[i]=9999 THEN oud_flags[i]=0;
     END;
 
-    oud_cnt=sum(of oud_flags[*]);
+    oud_cnt=SUM(of oud_flags[*]);
     IF oud_cnt > 0 THEN oud_master=1;
     ELSE oud_master=0;
     IF oud_master=0 THEN DELETE;
@@ -672,7 +783,7 @@ DATA oud;
     bsas_date=year_bsas + month_bsas * 0.01;
     pmp_date=year_pmp + month_pmp * 0.01;
 
-    min_date=min(apcd_date, cm_date, matris_date, bsas_date, pmp_date);
+    min_date=MIN(apcd_date, cm_date, matris_date, bsas_date, pmp_date);
 
     oud_year=floor(min_date);
     oud_month=round((min_date - oud_year) * 100);
@@ -690,27 +801,34 @@ data oud;
     set oud;
     by ID;
     if first.ID;
-run;
+RUN;
 
 data oud;
     set oud;
     age_grp_five=put(oud_age, age_grps_five.);
     IF age_grp_five=999 THEN DELETE;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE oud_distinct AS SELECT DISTINCT ID, oud_year, oud_month,
-        oud_age, age_grp_five as agegrp, FINAL_RE FROM oud;
+    CREATE TABLE oud_distinct AS
+    SELECT 
+        DISTINCT ID, 
+        oud_year, 
+        oud_month, 
+        oud_age, 
+        age_grp_five AS agegrp, 
+        FINAL_RE
+    FROM oud;
 QUIT;
 
-title "Number of unique IDs in Spine Dataset";
+title "Number of unique IDs IN Spine Dataset";
 
 PROC SQL;
-    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
-        oud_distinct;
+    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids
+    FROM oud_distinct;
 QUIT;
 
-%put Number of unique IDs in Spine Dataset: &num_unique_ids;
+%put Number of unique IDs IN Spine Dataset: &num_unique_ids;
 
 /*==============================*/
 /* 12. Add Pregancy Covariates  */
@@ -725,7 +843,7 @@ RUN;
 data fetal_deaths_renamed;
     set PHDFETAL.FETALDEATH;
     rename FETAL_DEATH_YEAR=YEAR_BIRTH MOTHER_AGE_FD=AGE_BIRTH;
-run;
+RUN;
 
 DATA fetal_deaths_renamed (keep=ID BIRTH_INDICATOR YEAR_BIRTH AGE_BIRTH);
     SET fetal_deaths_renamed (KEEP=ID YEAR_BIRTH AGE_BIRTH WHERE=(YEAR_BIRTH IN
@@ -738,36 +856,42 @@ DATA all_births;
 RUN;
 
 proc SQL;
-    CREATE TABLE births AS SELECT ID, SUM(BIRTH_INDICATOR) AS TOTAL_BIRTHS,
-        min(YEAR_BIRTH) as FIRST_BIRTH_YEAR, max(BIRTH_INDICATOR) as
-        BIRTH_INDICATOR FROM all_births GROUP BY ID;
-run;
-
-title "Number of unique IDs in births table";
-
+    CREATE TABLE births AS
+    SELECT 
+        ID, 
+        SUM(BIRTH_INDICATOR) AS TOTAL_BIRTHS,
+        MIN(YEAR_BIRTH) AS FIRST_BIRTH_YEAR, 
+        MAX(BIRTH_INDICATOR) AS
+        BIRTH_INDICATOR
+    FROM all_births
+    GROUP BY ID;
+RUN;
+title "Number of unique IDs IN births table";
 PROC SQL;
-    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
-        births;
+    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids
+    FROM births;
 QUIT;
 
-%put Number of unique IDs in births table: &num_unique_ids;
+%put Number of unique IDs IN births table: &num_unique_ids;
 title;
 
 PROC SQL;
-    CREATE TABLE oud_preg AS SELECT * FROM oud_distinct LEFT JOIN births ON
-        oud_distinct.ID=births.ID;
+    CREATE TABLE oud_preg AS
+    SELECT *
+    FROM oud_distinct
+    LEFT JOIN births ON oud_distinct.ID=births.ID;
 QUIT;
 
 DATA oud_preg;
     SET oud_preg;
     IF BIRTH_INDICATOR=. THEN BIRTH_INDICATOR=0;
-run;
+RUN;
 
 title "Summary stats: Number of Deliveries per Mom";
 
-proc means data=oud_preg mean median std min max q1 q3;
+proc means data=oud_preg mean median std MIN max q1 q3;
     var TOTAL_BIRTHS;
-run;
+RUN;
 
 /*=====================================*/
 /* Part 2: Summary Stats: MOUD         */
@@ -776,7 +900,7 @@ run;
 /* 1.  Import data/demographics */
 /*==============================*/
 
-/* This section processes the MOUD dataset, merges it with demographic, age group, and birth data. */
+/* This section processes the MOUD dataset, merges it with demographic, age group, AND birth data. */
 DATA moud;
     SET PHDSPINE.MOUD3;
 RUN;
@@ -786,39 +910,44 @@ PROC SORT data=moud;
 RUN;
 
 PROC SQL;
-    CREATE TABLE moud_demo AS SELECT moud.*, demographics.FINAL_RE,
-        demographics.YOB FROM moud LEFT JOIN PHDSPINE.DEMO AS demographics ON
-        moud.ID=demographics.ID;
+    CREATE TABLE moud_demo AS
+    SELECT moud.*, demographics.FINAL_RE, demographics.YOB
+    FROM moud
+    LEFT JOIN PHDSPINE.DEMO AS demographics ON moud.ID=demographics.ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE moud_demo AS SELECT moud_demo.*, oud.age_grp_five FROM
-        moud_demo LEFT JOIN oud ON moud_demo.ID=oud.ID;
+    CREATE TABLE moud_demo AS
+    SELECT moud_demo.*, oud.age_grp_five
+    FROM moud_demo
+    LEFT JOIN oud ON moud_demo.ID=oud.ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE moud_demo AS SELECT * FROM moud_demo LEFT JOIN births ON
-        moud_demo.ID=births.ID;
+    CREATE TABLE moud_demo AS
+    SELECT *
+    FROM moud_demo
+    LEFT JOIN births ON moud_demo.ID=births.ID;
 QUIT;
 
 DATA moud_demo;
     SET moud_demo;
     IF BIRTH_INDICATOR=. THEN BIRTH_INDICATOR=0;
-run;
+RUN;
 
 /*=====================================*/
-/* 2. Filter, Deduplicate, and Refine  */
+/* 2. Filter, Deduplicate, AND Refine  */
 /*=====================================*/
 
-/* This section sorts the MOUD dataset by episode ID, type, and date. It defines start and end dates
-for each episode, removes short episodes, ensures uniqueness, and resolves overlapping treatment periods. Then,
-it filters for records starting in 2014 or later, and retains only individuals present in the `oud_distinct` dataset */
+/* This section sorts the MOUD dataset by episode ID, type, AND date. It defines start AND end dates
+for each episode, removes short episodes, ensures uniqueness, AND resolves overlapping treatment periods. Then,
+it filters for records starting IN 2014 OR later, AND retains only individuals present IN the `oud_distinct` dataset */
 data moud_demo;
     set moud_demo;
     rename DATE_START_MOUD=start_date DATE_END_MOUD=end_date
         DATE_START_YEAR_MOUD=start_year DATE_END_YEAR_MOUD=end_year
         DATE_START_MONTH_MOUD=start_month DATE_END_MONTH_MOUD=end_month;
-run;
+RUN;
 
 PROC SORT DATA=moud_demo;
     by ID TYPE_MOUD start_date;
@@ -868,7 +997,9 @@ DATA moud_demo;
 RUN;
 
 PROC SQL;
-    CREATE TABLE moud_demo AS SELECT DISTINCT * FROM moud_demo;
+    CREATE TABLE moud_demo AS
+    SELECT DISTINCT *
+    FROM moud_demo;
 QUIT;
 
 PROC SORT data=moud_demo (KEEP=new_start_date new_start_month new_start_year
@@ -904,29 +1035,38 @@ PROC SORT data=moud_demo;
     BY ID new_start_date;
 RUN;
 
-proc sql;
-    create table moud_demo as select a.*, min(b.new_start_date) as
-        next_start_date, min(b.new_start_month) as next_start_month,
-        min(b.new_start_year) as next_start_year from moud_demo as a left join
-        moud_demo as b on a.ID=b.ID and a.TYPE_MOUD ne b.TYPE_MOUD and
-        b.new_start_date > a.new_start_date group by a.ID, a.TYPE_MOUD,
-        a.new_start_date order by a.ID, a.new_start_date;
-quit;
+PROC SQL;
+    CREATE TABLE moud_demo AS
+    SELECT 
+        a.*, 
+        MIN(b.new_start_date) AS next_start_date, 
+        MIN(b.new_start_month) AS next_start_month,
+        MIN(b.new_start_year) AS next_start_year
+    FROM moud_demo AS a
+    LEFT JOIN moud_demo AS b 
+        ON a.ID=b.ID 
+            AND a.TYPE_MOUD ne b.TYPE_MOUD 
+            AND b.new_start_date > a.new_start_date
+    GROUP BY a.ID, a.TYPE_MOUD,
+        a.new_start_date ORDER BY a.ID, a.new_start_date;
+QUIT;
 
 data moud_demo;
     set moud_demo;
 
-    if next_start_date ne . and new_end_date > next_start_date then do;
+    if next_start_date ne . AND new_end_date > next_start_date then do;
         new_end_date=next_start_date;
         new_end_month=next_start_month;
         new_end_year=next_start_year;
     end;
 
     drop next_start_date next_start_month next_start_year;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE moud_demo AS SELECT DISTINCT * FROM moud_demo;
+    CREATE TABLE moud_demo AS
+    SELECT DISTINCT *
+    FROM moud_demo;
 QUIT;
 
 data moud_demo;
@@ -936,94 +1076,108 @@ data moud_demo;
     if first.ID then episode_num=1;
     else episode_num + 1;
     episode_id=catx("_", ID, episode_num);
-run;
+RUN;
 
-proc sql;
-    select count(*) as missing_new_end_date from moud_demo where new_end_date is
-        missing;
-quit;
+PROC SQL;
+    SELECT count(*) AS missing_new_end_date
+    FROM moud_demo
+    WHERE new_end_date IS missing;
+QUIT;
 
 data moud_demo;
     set moud_demo;
     where new_start_year >= 2014;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE moud_demo AS SELECT * FROM moud_demo WHERE ID IN (SELECT
-        DISTINCT ID FROM oud_distinct);
+    CREATE TABLE moud_demo AS
+    SELECT *
+    FROM moud_demo
+    WHERE ID IN (
+    SELECT DISTINCT ID
+    FROM oud_distinct);
 QUIT;
 
-proc sql;
-    create table moud_demo as select moud_demo.*, cov.oud_year, cov.oud_month
-        from moud_demo left join oud_distinct as cov on moud_demo.ID=cov.ID;
-quit;
+PROC SQL;
+    CREATE TABLE moud_demo AS
+    SELECT moud_demo.*, cov.oud_year, cov.oud_month
+    FROM moud_demo
+    LEFT JOIN oud_distinct AS cov ON moud_demo.ID=cov.ID;
+QUIT;
 
-proc sql;
-    create table moud_demo as select * from moud_demo where (new_start_year >
-        oud_year) or (new_start_year=oud_year and new_start_month >= oud_month)
-        order by ID, new_start_year, new_start_month;
-quit;
+PROC SQL;
+    CREATE TABLE moud_demo AS
+    SELECT *
+    FROM moud_demo
+    WHERE 
+        (new_start_year > oud_year) OR 
+        (new_start_year=oud_year AND new_start_month >= oud_month)
+    ORDER BY ID, new_start_year, new_start_month;
+QUIT;
 
 /*===============================================*/
 /* 3. Summary Statistics for MOUD Participants  */
 /*===============================================*/
-/* This section calculates the number of unique individuals who experienced MOUD overall and
-stratifies them by pregnancy status, race/ethnicity, and age at OUD diagnosis. It also
-generates frequency distributions of MOUD types overall and stratified by these demographics. */
+/* This section calculates the number of unique individuals who experienced MOUD overall AND
+stratifies them by pregnancy status, race/ethnicity, AND age at OUD diagnosis. It also
+generates frequency distributions of MOUD types overall AND stratified by these demographics. */
 title "Number of persons that experienced MOUD";
 
 PROC SQL;
-    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
-        moud_demo;
+    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids
+    FROM moud_demo;
 QUIT;
 
 title "Number of persons that experienced MOUD by Pregnancy";
 
 PROC SQL;
-    SELECT BIRTH_INDICATOR, COUNT(DISTINCT ID) AS Number_of_Unique_IDs FROM
-        moud_demo GROUP BY BIRTH_INDICATOR;
+    SELECT BIRTH_INDICATOR, COUNT(DISTINCT ID) AS Number_of_Unique_IDs
+    FROM moud_demo
+    GROUP BY BIRTH_INDICATOR;
 QUIT;
 
 title "Number of persons that experienced MOUD by FINAL_RE";
 
 PROC SQL;
-    SELECT FINAL_RE, COUNT(DISTINCT ID) AS Number_of_Unique_IDs FROM moud_demo
-        GROUP BY FINAL_RE;
+    SELECT FINAL_RE, COUNT(DISTINCT ID) AS Number_of_Unique_IDs
+    FROM moud_demo
+    GROUP BY FINAL_RE;
 QUIT;
 
 title "Number of persons that experienced MOUD by Age at OUD Diagnosis";
 
 PROC SQL;
-    SELECT age_grp_five, COUNT(DISTINCT ID) AS Number_of_Unique_IDs FROM
-        moud_demo GROUP BY age_grp_five;
+    SELECT age_grp_five, COUNT(DISTINCT ID) AS Number_of_Unique_IDs
+    FROM moud_demo
+    GROUP BY age_grp_five;
 QUIT;
 
 proc format;
     value moud_typef 1='Likely Methadone' 2='Buprenorphine' 3='Naltrexone';
-run;
+RUN;
 
 title "Overall Distribution of MOUD Types per episode";
 
 proc freq data=moud_demo;
     table TYPE_MOUD;
     format TYPE_MOUD moud_typef.;
-run;
+RUN;
 
 title "Overall Distribution of MOUD episodes Stratified by Pregnancy";
 
 proc sort data=moud_demo;
     by BIRTH_INDICATOR;
-run;
+RUN;
 
 proc freq data=moud_demo;
     table TYPE_MOUD;
     format TYPE_MOUD moud_typef.;
     by BIRTH_INDICATOR;
-run;
+RUN;
 
 proc sort data=moud_demo;
     by FINAL_RE;
-run;
+RUN;
 
 title "Overall Distribution of MOUD episodes Stratified by Race/Ethnicity";
 
@@ -1031,11 +1185,11 @@ proc freq data=moud_demo;
     by FINAL_RE;
     table TYPE_MOUD;
     format TYPE_MOUD moud_typef.;
-run;
+RUN;
 
 proc sort data=moud_demo;
     by age_grp_five;
-run;
+RUN;
 
 title
     "Overall Distribution of MOUD episodes Stratified by Age at OUD Diagnosis";
@@ -1044,7 +1198,7 @@ proc freq data=moud_demo;
     by age_grp_five;
     table TYPE_MOUD;
     format TYPE_MOUD moud_typef.;
-run;
+RUN;
 title;
 
 /*=======================================*/
@@ -1054,30 +1208,43 @@ title;
 /* This section creates a dataset identifying individuals who initiated MOUD,
 assigning a flag (`moud_start = 1`). It then integrates this information
 into the `oud_preg` dataset to indicate whether each individual had a MOUD start
-We consider two MOUD start outcomes 1. EVER_MOUD which is simply and ID that exists in
-the MOUD dataset. The other is indicated here, meaning they exist in the cleaned MOUD dataset. */
+We consider two MOUD start outcomes 1. EVER_MOUD which IS simply AND ID that exists IN
+the MOUD dataset. The other IS indicated here, meaning they exist IN the cleaned MOUD dataset. */
 PROC SQL;
-    CREATE TABLE moud_starts AS SELECT ID, 1 AS moud_start FROM moud_demo ORDER
-        BY new_start_month, new_start_year, TYPE_MOUD, ID;
+    CREATE TABLE moud_starts AS
+    SELECT ID, 1 AS moud_start
+    FROM moud_demo 
+    ORDER BY new_start_month, new_start_year, TYPE_MOUD, ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE moud_starts AS SELECT DISTINCT * FROM moud_starts;
+    CREATE TABLE moud_starts AS
+    SELECT DISTINCT *
+    FROM moud_starts;
 QUIT;
 
-proc sql;
-    create table moud_preg as select *, case when ID in (select ID from
-        moud_starts) then 1 else 0 end as moud_start from oud_preg;
-quit;
+PROC SQL;
+    CREATE TABLE moud_preg AS
+    SELECT 
+        *, 
+        CASE
+            WHEN ID IN (
+    SELECT ID
+    FROM moud_starts)
+            THEN 1
+            ELSE 0
+        END AS moud_start
+    FROM oud_preg;
+QUIT;
 
 /*========================================*/
 /* 5. Calculate MOUD Episode Durations   */
 /*========================================*/
 
-/* This section calculates the length of each MOUD episode and categorizes
-them into duration groups (0-1 month, 2-6 months, 6-12 months, 1-2 years, 2+ years, and entire follow-up period).
-It then summarizes the number of episodes overall and per individual, stratified by
-pregnancy status, race/ethnicity, and age group. */
+/* This section calculates the length of each MOUD episode AND categorizes
+them into duration groups (0-1 month, 2-6 months, 6-12 months, 1-2 years, 2+ years, AND entire follow-up period).
+It then summarizes the number of episodes overall AND per individual, stratified by
+pregnancy status, race/ethnicity, AND age group. */
 data episode_length;
     set moud_demo;
 
@@ -1090,32 +1257,32 @@ data episode_length;
     episode_gt24months=0;
     episode_full_followup=0;
 
-    if (new_start_year < 2014 or (new_start_year=2014 and new_start_month <= 1))
-        and (new_end_year > 2022 or (new_end_year=2022 and new_end_month >= 12))
+    if (new_start_year < 2014 OR (new_start_year=2014 AND new_start_month <= 1))
+        AND (new_end_year > 2022 OR (new_end_year=2022 AND new_end_month >= 12))
         then episode_full_followup=1;
     else do;
         if episode_length < 30 then episode_1month=1; /* 0-1 month */
-        else if episode_length >= 30 and episode_length < 180 then
+        else if episode_length >= 30 AND episode_length < 180 then
             episode_6months=1; /* 2-6 months */
-        else if episode_length >= 180 and episode_length < 365 then
+        else if episode_length >= 180 AND episode_length < 365 then
             episode_12months=1; /* 6-12 months */
-        else if episode_length >= 365 and episode_length < 730 then
+        else if episode_length >= 365 AND episode_length < 730 then
             episode_24months=1; /* 1-2 years */
         else if episode_length >= 730 then episode_gt24months=1; /* 2+ years */
     end;
 
-run;
+RUN;
 
 title "Frequency Distribution of Episode Length";
 
 proc freq data=episode_length;
     tables episode_1month episode_6months episode_12months episode_24months
         episode_gt24months episode_full_followup;
-run;
+RUN;
 
 proc sort data=episode_length;
     by TYPE_MOUD;
-run;
+RUN;
 
 title "Frequency Distribution of Episode Length by MOUD Type";
 
@@ -1123,29 +1290,29 @@ proc freq data=episode_length;
     by TYPE_MOUD;
     tables episode_1month episode_6months episode_12months episode_24months
         episode_gt24months episode_full_followup;
-run;
+RUN;
 title;
 
 proc sort data=episode_length;
     by ID descending episode_length;
-run;
+RUN;
 
 data episode_length_personlvl;
     set episode_length;
     by ID;
     if first.ID;
-run;
+RUN;
 
 title "Frequency Distribution of Episode Length - Person-Level Data";
 
 proc freq data=episode_length_personlvl;
     tables episode_1month episode_6months episode_12months episode_24months
         episode_gt24months episode_full_followup;
-run;
+RUN;
 
 proc sort data=episode_length_personlvl;
     by TYPE_MOUD;
-run;
+RUN;
 
 title
     "Frequency Distribution of Episode Length by MOUD Type - Person-Level Data ";
@@ -1154,136 +1321,144 @@ proc freq data=episode_length_personlvl;
     by TYPE_MOUD;
     tables episode_1month episode_6months episode_12months episode_24months
         episode_gt24months episode_full_followup;
-run;
+RUN;
 title;
 
-proc sql;
-    create table episode_counts as select ID, BIRTH_INDICATOR, FINAL_RE,
-        age_grp_five, count(*) as num_episodes from episode_length group by ID;
-quit;
+PROC SQL;
+    CREATE TABLE episode_counts AS
+    SELECT ID, BIRTH_INDICATOR, FINAL_RE, age_grp_five, count(*) AS num_episodes
+    FROM episode_length
+    GROUP BY ID;
+QUIT;
 
-proc sql;
-    create table episode_counts as select distinct ID, BIRTH_INDICATOR,
-        FINAL_RE, age_grp_five, num_episodes from episode_counts;
-quit;
+PROC SQL;
+    CREATE TABLE episode_counts AS
+    SELECT DISTINCT ID, BIRTH_INDICATOR, FINAL_RE, age_grp_five, num_episodes
+    FROM episode_counts;
+QUIT;
 
 title "Summary stats: Mean number of MOUD episodes per person";
 
-proc means data=episode_counts mean median std min max q1 q3;
+proc means data=episode_counts mean median std MIN max q1 q3;
     var num_episodes;
-run;
+RUN;
 
 title
     "Summary stats: Mean number of MOUD episodes per person by BIRTH_INDICATOR";
 
-proc means data=episode_counts mean median std min max q1 q3;
+proc means data=episode_counts mean median std MIN max q1 q3;
     class BIRTH_INDICATOR;
     var num_episodes;
-run;
+RUN;
 
 title "Summary stats: Mean number of MOUD episodes per person by FINAL_RE";
 
-proc means data=episode_counts mean median std min max q1 q3;
+proc means data=episode_counts mean median std MIN max q1 q3;
     class FINAL_RE;
     var num_episodes;
-run;
+RUN;
 
 title
     "Summary stats: Mean number of MOUD episodes per person by Age at OUD Diagnosis";
 
-proc means data=episode_counts mean median std min max q1 q3;
+proc means data=episode_counts mean median std MIN max q1 q3;
     class age_grp_five;
     var num_episodes;
-run;
+RUN;
 
 title "Summary stats: MOUD episode duration (days)";
 
-proc means data=episode_length mean median std min max q1 q3;
+proc means data=episode_length mean median std MIN max q1 q3;
     var episode_length;
-run;
+RUN;
 
 title "Summary stats: MOUD episode duration (days) by BIRTH_INDICATOR";
 
-proc means data=episode_length mean median std min max q1 q3;
+proc means data=episode_length mean median std MIN max q1 q3;
     class BIRTH_INDICATOR;
     var episode_length;
-run;
+RUN;
 
 title "Summary stats: MOUD episode duration (days) by FINAL_RE";
 
-proc means data=episode_length mean median std min max q1 q3;
+proc means data=episode_length mean median std MIN max q1 q3;
     class FINAL_RE;
     var episode_length;
-run;
+RUN;
 
 title "Summary stats: MOUD episode duration (days) by Age at OUD Diagnosis";
 
-proc means data=episode_length mean median std min max q1 q3;
+proc means data=episode_length mean median std MIN max q1 q3;
     class age_grp_five;
     var episode_length;
-run;
+RUN;
 
 /*===============================================*/
-/* 7. Aggregating MOUD Episodes and Validation  */
+/* 7. Aggregating MOUD Episodes AND Validation  */
 /*===============================================*/
 
 /* This section aggregates the duration-based classification of MOUD episodes
 per individual, merges the episode counts into the pregnancy dataset,
-and performs validation checks to ensure consistency in episode classification. */
-proc sql;
-    create table aggregated_episode as select ID, sum(episode_1month) as
-        episode_1month_sum, sum(episode_6months) as episode_6months_sum,
-        sum(episode_12months) as episode_12months_sum, sum(episode_24months) as
-        episode_24months_sum, sum(episode_gt24months) as episode_gt24months_sum,
-        sum(episode_full_followup) as episode_full_followup_sum from
-        episode_length group by ID;
-quit;
+AND performs validation checks to ensure consistency IN episode classification. */
+PROC SQL;
+    CREATE TABLE aggregated_episode AS
+    SELECT 
+        ID, 
+        SUM(episode_1month) AS episode_1month_sum, 
+        SUM(episode_6months) AS episode_6months_sum,
+        SUM(episode_12months) AS episode_12months_sum, 
+        SUM(episode_24months) AS episode_24months_sum, 
+        SUM(episode_gt24months) AS episode_gt24months_sum,
+        SUM(episode_full_followup) AS episode_full_followup_sum
+    FROM episode_length
+    GROUP BY ID;
+QUIT;
 
 data moud_preg;
-    merge moud_preg (in=a) episode_counts (in=b);
+    merge moud_preg (IN=a) episode_counts (IN=b);
     by ID;
     if a;
-run;
+RUN;
 
 data moud_preg;
-    merge moud_preg (in=a) aggregated_episode (in=b);
+    merge moud_preg (IN=a) aggregated_episode (IN=b);
     by ID;
     if a;
-run;
+RUN;
 
 data moud_preg;
     set moud_preg;
 
-    if episode_12months_sum > 0 or episode_24months_sum > 0 or
-        episode_gt24months_sum > 0 or episode_full_followup_sum > 0 then
+    if episode_12months_sum > 0 OR episode_24months_sum > 0 OR
+        episode_gt24months_sum > 0 OR episode_full_followup_sum > 0 then
         EVER_6MO=1;
     else EVER_6MO=0;
-run;
+RUN;
 
 data check_moud_count;
     set moud_preg;
 
-    MOUD_Sum=sum(episode_1month_sum, episode_6months_sum, episode_12months_sum,
+    MOUD_Sum=SUM(episode_1month_sum, episode_6months_sum, episode_12months_sum,
         episode_24months_sum, episode_gt24months_sum,
         episode_full_followup_sum);
 
     if MOUD_Sum=num_episodes then MOUD_Match=1;
     else MOUD_Match=0;
-run;
+RUN;
 
-title "Check that the sum of MOUD_duration variables = number MOUD episodes";
+title "Check that the SUM of MOUD_duration variables = number MOUD episodes";
 
 proc freq data=check_moud_count;
     tables MOUD_Match;
-run;
+RUN;
 title;
 
 /*================================================*/
-/* 9. Processing Overdose Data and Merging Demographics */
+/* 9. Processing Overdose Data AND Merging Demographics */
 /*================================================*/
 
 /* This section processes the overdose dataset, filters it for data from 2014 onwards,
-merges with the MOUD pregnancy data, and joins additional demographic information. */
+merges with the MOUD pregnancy data, AND joins additional demographic information. */
 DATA overdose_spine (KEEP=ID OD_YEAR OD_RACE OD_COUNT OD_AGE OD_DATE
     FATAL_OD_DEATH);
     SET PHDSPINE.OVERDOSE;
@@ -1292,53 +1467,65 @@ RUN;
 data overdose_spine;
     set overdose_spine;
     where OD_YEAR >= 2014;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE overdose_spine AS SELECT * FROM overdose_spine WHERE ID IN
-        (SELECT DISTINCT ID FROM moud_preg);
+    CREATE TABLE overdose_spine AS
+    SELECT *
+    FROM overdose_spine
+    WHERE ID IN (
+    SELECT DISTINCT ID
+    FROM moud_preg);
 QUIT;
 
 PROC SQL;
-    CREATE TABLE overdose_spine AS SELECT * FROM overdose_spine LEFT JOIN births
-        ON overdose_spine.ID=births.ID;
+    CREATE TABLE overdose_spine AS
+    SELECT *
+    FROM overdose_spine
+    LEFT JOIN births ON overdose_spine.ID=births.ID;
 QUIT;
 
 DATA overdose_spine;
     SET overdose_spine;
     IF BIRTH_INDICATOR=. THEN BIRTH_INDICATOR=0;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE overdose_spine AS SELECT overdose_spine.*,
-        demographics.FINAL_RE, demographics.YOB FROM overdose_spine LEFT JOIN
-        PHDSPINE.DEMO AS demographics ON overdose_spine.ID=demographics.ID;
+    CREATE TABLE overdose_spine AS
+    SELECT overdose_spine.*, demographics.FINAL_RE, demographics.YOB
+    FROM overdose_spine
+    LEFT JOIN PHDSPINE.DEMO AS demographics 
+        ON overdose_spine.ID=demographics.ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE overdose_spine AS SELECT overdose_spine.*, oud.age_grp_five
-        FROM overdose_spine LEFT JOIN oud ON overdose_spine.ID=oud.ID;
+    CREATE TABLE overdose_spine AS
+    SELECT overdose_spine.*, oud.age_grp_five
+    FROM overdose_spine
+    LEFT JOIN oud ON overdose_spine.ID=oud.ID;
 QUIT;
 
 /*==============================================*/
-/* 10. Overdose Summary and Counts by Demographics */
+/* 10. Overdose Summary AND Counts by Demographics */
 /*==============================================*/
-/* This section calculates and displays the number of unique IDs that experienced an overdose,
-stratified by BIRTH_INDICATOR, FINAL_RE, and age group. */
+/* This section calculates AND displays the number of unique IDs that experienced an overdose,
+stratified by BIRTH_INDICATOR, FINAL_RE, AND age group. */
 title "Number of persons that experienced overdose";
 
 PROC SQL;
-    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
-        overdose_spine;
+    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids
+    FROM overdose_spine;
 QUIT;
 
 proc sort data=overdose_spine;
     by BIRTH_INDICATOR;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE overdose_summary AS SELECT BIRTH_INDICATOR, COUNT(DISTINCT ID)
-        AS Number_of_Unique_IDs FROM overdose_spine GROUP BY BIRTH_INDICATOR;
+    CREATE TABLE overdose_summary AS
+    SELECT BIRTH_INDICATOR, COUNT(DISTINCT ID) AS Number_of_Unique_IDs
+    FROM overdose_spine
+    GROUP BY BIRTH_INDICATOR;
 QUIT;
 
 PROC PRINT DATA=overdose_summary;
@@ -1346,8 +1533,10 @@ PROC PRINT DATA=overdose_summary;
 RUN;
 
 PROC SQL;
-    CREATE TABLE overdose_summary AS SELECT FINAL_RE, COUNT(DISTINCT ID) AS
-        Number_of_Unique_IDs FROM overdose_spine GROUP BY FINAL_RE;
+    CREATE TABLE overdose_summary AS
+    SELECT FINAL_RE, COUNT(DISTINCT ID) AS Number_of_Unique_IDs
+    FROM overdose_spine
+    GROUP BY FINAL_RE;
 QUIT;
 
 PROC PRINT DATA=overdose_summary;
@@ -1355,8 +1544,10 @@ PROC PRINT DATA=overdose_summary;
 RUN;
 
 PROC SQL;
-    CREATE TABLE overdose_summary AS SELECT age_grp_five, COUNT(DISTINCT ID) AS
-        Number_of_Unique_IDs FROM overdose_spine GROUP BY age_grp_five;
+    CREATE TABLE overdose_summary AS
+    SELECT age_grp_five, COUNT(DISTINCT ID) AS Number_of_Unique_IDs
+    FROM overdose_spine
+    GROUP BY age_grp_five;
 QUIT;
 
 PROC PRINT DATA=overdose_summary;
@@ -1365,89 +1556,88 @@ PROC PRINT DATA=overdose_summary;
 RUN;
 
 /*====================================================*/
-/* 11. Overdose Flag Summary and Counts by Demographics */
+/* 11. Overdose Flag Summary AND Counts by Demographics */
 /*====================================================*/
 
-/* This section generates and summarizes overdose data by creating an "overdose flag" based on the fatality status,
-and then stratifies this data by key demographic factors including pregnancy status, race/ethnicity, and age at OUD diagnosis.
-The summary statistics for overdose counts per person are also calculated, both overall and stratified by pregnancy status. */
+/* This section generates AND summarizes overdose data by creating an "overdose flag" based ON the fatality status,
+AND then stratifies this data by key demographic factors including pregnancy status, race/ethnicity, AND age at OUD diagnosis.
+The summary statistics for overdose counts per person are also calculated, both overall AND stratified by pregnancy status. */
 proc sort data=overdose_spine;
     by ID OD_DATE;
-run;
+RUN;
 
-proc sql;
-    create table overdose_summary as select ID, BIRTH_INDICATOR, OD_RACE,
-        OD_AGE, FATAL_OD_DEATH, case when FATAL_OD_DEATH=1 then 2 else 1 end as
-        overdose_flag from overdose_spine quit;
-
+PROC SQL;
+    CREATE TABLE overdose_summary AS
+    SELECT 
+        ID, 
+        BIRTH_INDICATOR, 
+        OD_RACE,
+        OD_AGE, 
+        FATAL_OD_DEATH, 
+        CASE
+            WHEN FATAL_OD_DEATH=1
+            THEN 2
+            ELSE 1
+        END AS overdose_flag
+    FROM overdose_spine QUIT;
 data overdose_summary;
     set overdose_summary;
     OD_AGE=put(OD_AGE, age_grps_five.);
-run;
-
+RUN;
 title "Overall Distribution of Overdose Flag";
-
 proc freq data=overdose_summary;
     tables overdose_flag;
-run;
-
+RUN;
 title "Overall Distribution of Overdose Flag Stratified by Pregnancy";
-
 proc sort data=overdose_summary;
     by BIRTH_INDICATOR;
-run;
-
+RUN;
 proc freq data=overdose_summary;
     tables overdose_flag;
     by BIRTH_INDICATOR;
-run;
-
+RUN;
 proc sort data=overdose_summary;
     by OD_RACE;
-run;
-
+RUN;
 title "Distribution of Overdose Flag Stratified by Race/Ethnicity";
-
 proc freq data=overdose_summary;
     by OD_RACE;
     tables overdose_flag;
-run;
-
+RUN;
 proc sort data=overdose_summary;
     by OD_AGE;
-run;
-
+RUN;
 title "Distribution of Overdose Flag Stratified by Age at OUD Diagnosis";
-
 proc freq data=overdose_summary;
     by OD_AGE;
     tables overdose_flag;
-run;
-
-proc sql;
-    create table overdose_counts as select ID, max(BIRTH_INDICATOR) as
-        BIRTH_INDICATOR, max(OD_Count) as OD_Count from overdose_spine group by
-        ID;
-quit;
+RUN;
+PROC SQL;
+    CREATE TABLE overdose_counts AS
+    SELECT 
+        ID, max(BIRTH_INDICATOR) AS BIRTH_INDICATOR, max(OD_Count) AS OD_Count
+    FROM overdose_spine
+    GROUP BY ID;
+QUIT;
 
 title "Summary stats: Overdose counts per person";
 
-proc means data=overdose_counts mean median std min max q1 q3;
+proc means data=overdose_counts mean median std MIN max q1 q3;
     var OD_Count;
-run;
+RUN;
 
-proc means data=overdose_counts mean median std min max q1 q3;
+proc means data=overdose_counts mean median std MIN max q1 q3;
     class BIRTH_INDICATOR;
     var OD_Count;
-run;
+RUN;
 
 /*==========================================================*/
-/* 12. MOUD Episodes and Overdose During/After MOUD         */
+/* 12. MOUD Episodes AND Overdose During/After MOUD         */
 /*==========================================================*/
 
-/* This section processes the MOUD start and end dates for each individual, and identifies episodes of overdose during and after MOUD treatment.
-The array is necessary to pivot from episode-level to person-level data to allow the calculation of overdose occurrences during the treatment period,
-within 30 days after treatment, or with no MOUD treatment. */
+/* This section processes the MOUD start AND end dates for each individual, AND identifies episodes of overdose during AND after MOUD treatment.
+The array IS necessary to pivot from episode-level to person-level data to allow the calculation of overdose occurrences during the treatment period,
+within 30 days after treatment, OR with no MOUD treatment. */
 PROC SORT data=moud_demo;
     by ID new_start_date;
 RUN;
@@ -1491,11 +1681,11 @@ DATA moud_od_demo;
         OD_after_MOUD=0;
         OD_no_MOUD=0;
         OD_COUNT_CHECK=0;
-        /*  This variable is to check the total N ODs per person since OD_COUNT is persistent through whole OD table, while we clean the table and filter short episodes */
+        /*  This variable IS to check the total N ODs per person since OD_COUNT IS persistent through whole OD table, while we clean the table AND filter short episodes */
     END;
 
     DO i=1 TO num_moud_episodes;
-        /* Case 1: Both MOUD_START(i) and MOUD_END(i) are present */
+        /* Case 1: Both MOUD_START(i) AND MOUD_END(i) are present */
         IF NOT MISSING(MOUD_START(i)) AND NOT MISSING(MOUD_END(i)) THEN DO;
             IF OD_DATE >= MOUD_START(i) AND OD_DATE <= MOUD_END(i) THEN DO;
                 OD_during_MOUD + 1;
@@ -1508,7 +1698,7 @@ DATA moud_od_demo;
             END;
         END;
 
-        /* Case 2: MOUD_END(i) is present, but MOUD_START(i) is missing */
+        /* Case 2: MOUD_END(i) IS present, but MOUD_START(i) IS missing */
         ELSE IF MISSING(MOUD_START(i)) AND NOT MISSING(MOUD_END(i)) THEN DO;
             IF OD_DATE <= MOUD_END(i) THEN DO;
                 OD_during_MOUD + 1;
@@ -1521,7 +1711,7 @@ DATA moud_od_demo;
             END;
         END;
 
-        /* Case 3: MOUD_START(i) is present, but MOUD_END(i) is missing */
+        /* Case 3: MOUD_START(i) IS present, but MOUD_END(i) IS missing */
         ELSE IF NOT MISSING(MOUD_START(i)) AND MISSING(MOUD_END(i)) THEN DO;
             IF OD_DATE >= MOUD_START(i) THEN DO;
                 OD_during_MOUD + 1;
@@ -1541,19 +1731,30 @@ DATA moud_od_demo;
     DROP i;
 RUN;
 
-proc sql;
-    create table overdose_summary as select ID, max(OD_COUNT) as TOTAL_OD_COUNT,
-        max(OD_during_MOUD) as N_OD_during_MOUD, max(OD_after_MOUD) as
-        N_OD_after_MOUD, max(OD_no_MOUD) as N_OD_no_MOUD, max(OD_COUNT_CHECK) as
-        OD_COUNT_CHECK from moud_od_demo group by ID;
-quit;
-
-proc sql;
-    create table overdose_summary as select distinct * from overdose_summary;
-quit;
+PROC SQL;
+    CREATE TABLE overdose_summary AS
+    SELECT 
+        ID, 
+        max(OD_COUNT) AS TOTAL_OD_COUNT,
+        max(OD_during_MOUD) AS N_OD_during_MOUD, 
+        max(OD_after_MOUD) AS N_OD_after_MOUD, 
+        max(OD_no_MOUD) AS N_OD_no_MOUD, 
+        max(OD_COUNT_CHECK) AS OD_COUNT_CHECK
+    FROM moud_od_demo
+    GROUP BY ID;
+QUIT;
 
 PROC SQL;
-    CREATE TABLE moud_preg AS SELECT * FROM moud_preg LEFT JOIN overdose_summary
+    CREATE TABLE overdose_summary AS
+    SELECT DISTINCT *
+    FROM overdose_summary;
+QUIT;
+
+PROC SQL;
+    CREATE TABLE moud_preg AS
+    SELECT *
+    FROM moud_preg
+    LEFT JOIN overdose_summary
         ON moud_preg.ID=overdose_summary.ID;
 QUIT;
 
@@ -1575,7 +1776,7 @@ DATA check_od_count;
     if missing(N_OD_during_MOUD) then N_OD_during_MOUD=0;
     if missing(N_OD_after_MOUD) then N_OD_after_MOUD=0;
 
-    OD_Sum=sum(N_OD_no_MOUD, N_OD_during_MOUD, N_OD_after_MOUD);
+    OD_Sum=SUM(N_OD_no_MOUD, N_OD_during_MOUD, N_OD_after_MOUD);
 
     if OD_Sum=TOTAL_OD_COUNT then OD_Match=1;
     else OD_Match=0;
@@ -1586,58 +1787,65 @@ DATA check_od_count;
 RUN;
 
 /*==========================================================*/
-/* 14. Overdose Validation and Distribution Analysis          */
+/* 14. Overdose Validation AND Distribution Analysis          */
 /*==========================================================*/
-/* This section validates that the sum of overdose occurrences (during, after, and without MOUD treatment) matches the total overdose count. The frequency distribution of OD_Match is checked,
-and summary statistics for overdose counts are calculated to examine the distribution of overdoses relative to MOUD treatment status. */
+/* This section validates that the SUM of overdose occurrences (during, after, AND without MOUD treatment) matches the total overdose count. The frequency distribution of OD_Match IS checked,
+AND summary statistics for overdose counts are calculated to examine the distribution of overdoses relative to MOUD treatment status. */
 title
-    "Check that the sum of OD_during_MOUD variables = TOTAL_OD_COUNT and OD_COUNT_CHECK consistency";
+    "Check that the SUM of OD_during_MOUD variables = TOTAL_OD_COUNT AND OD_COUNT_CHECK consistency";
 
 proc freq data=check_od_count;
     tables OD_Match OD_COUNT_MATCH;
-run;
+RUN;
 title;
 
 title "Distribution of OD relative to MOUD";
 
 data check_od_count;
     set check_od_count;
-    total_overdoses=sum(of N_OD_no_MOUD N_OD_during_MOUD N_OD_after_MOUD);
-run;
+    total_overdoses=SUM(of N_OD_no_MOUD N_OD_during_MOUD N_OD_after_MOUD);
+RUN;
 
-proc means data=check_od_count sum;
+proc means data=check_od_count SUM;
     var N_OD_no_MOUD N_OD_during_MOUD N_OD_after_MOUD total_overdoses;
-run;
+RUN;
 title;
 
 PROC SQL;
-    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
-        moud_preg;
+    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids
+    FROM moud_preg;
 QUIT;
 
-%put Number of Unique IDs in Main Dataset: &num_unique_ids;
+%put Number of Unique IDs IN Main Dataset: &num_unique_ids;
 
 /* ======================= */
 /* Part 3: Table 1         */
 
 /* ======================= */
-proc sql;
-    create table FINAL_COHORT as select moud_preg.*, demographics.HOMELESS_EVER,
-        demographics.EVER_INCARCERATED, demographics.FOREIGN_BORN,
-        demographics.LANGUAGE, demographics.EDUCATION, demographics.YOB,
-        demographics.OCCUPATION_CODE from moud_preg left join PHDSPINE.DEMO as
-        demographics on moud_preg.ID=demographics.ID;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        moud_preg.*, 
+        demographics.HOMELESS_EVER,
+        demographics.EVER_INCARCERATED, 
+        demographics.FOREIGN_BORN,
+        demographics.LANGUAGE, 
+        demographics.EDUCATION, 
+        demographics.YOB,
+        demographics.OCCUPATION_CODE
+    FROM moud_preg
+    LEFT JOIN PHDSPINE.DEMO AS demographics ON moud_preg.ID=demographics.ID;
+QUIT;
 
 data FINAL_COHORT;
     length LANGUAGE_SPOKEN_GROUP $30;
     set FINAL_COHORT;
     if LANGUAGE=1 then LANGUAGE_SPOKEN_GROUP='English';
     else if LANGUAGE=2 then LANGUAGE_SPOKEN_GROUP=
-        'English and Another Language';
+        'English AND Another Language';
     else if LANGUAGE=3 then LANGUAGE_SPOKEN_GROUP='Another Language';
-    else LANGUAGE_SPOKEN_GROUP='Refused or Unknown';
-run;
+    else LANGUAGE_SPOKEN_GROUP='Refused OR Unknown';
+RUN;
 
 data FINAL_COHORT;
     length HOMELESS_HISTORY_GROUP $10;
@@ -1645,116 +1853,211 @@ data FINAL_COHORT;
     if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
     else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
     else HOMELESS_HISTORY_GROUP='Unknown';
-run;
+RUN;
 
 data FINAL_COHORT;
     length EDUCATION_GROUP $30;
     set FINAL_COHORT;
-    if EDUCATION=1 then EDUCATION_GROUP='HS or less';
+    if EDUCATION=1 then EDUCATION_GROUP='HS OR less';
     else if EDUCATION=2 then EDUCATION_GROUP='13+ years';
-    else EDUCATION_GROUP='Other or Unknown';
-run;
+    else EDUCATION_GROUP='Other OR Unknown';
+RUN;
 
-proc sql;
-    create table MENTAL_HEALTH_COHORT(where=(MENTAL_HEALTH_DIAG=1)) as select
-        distinct FINAL_COHORT.ID, case when
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ECODE) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ADM_DIAGNOSIS) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD1) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD2) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD3) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD4) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD5) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD6) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD7) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD8) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD9) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD10) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD11) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD12) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD13) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD14) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD15) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD16) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD17) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD18) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD19) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD20) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD21) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD22) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD23) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD24) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_ICD25) > 0 or
-        prxmatch('/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
-        apcd.MED_DIS_DIAGNOSIS) > 0 or substr(apcd.MED_ECODE, 1, 3) in ('295',
-        '296', '297', '298', '300', '311') or substr(apcd.MED_ADM_DIAGNOSIS, 1,
-        3) in ('295', '296', '297', '298', '300', '311') or
-        substr(apcd.MED_ICD1, 1, 3) in ('295', '296', '297', '298', '300',
-        '311') or substr(apcd.MED_ICD2, 1, 3) in ('295', '296', '297', '298',
-        '300', '311') or substr(apcd.MED_ICD3, 1, 3) in ('295', '296', '297',
-        '298', '300', '311') or substr(apcd.MED_ICD4, 1, 3) in ('295', '296',
-        '297', '298', '300', '311') or substr(apcd.MED_ICD5, 1, 3) in ('295',
-        '296', '297', '298', '300', '311') or substr(apcd.MED_ICD6, 1, 3) in
-        ('295', '296', '297', '298', '300', '311') or substr(apcd.MED_ICD7, 1,
-        3) in ('295', '296', '297', '298', '300', '311') or
-        substr(apcd.MED_ICD8, 1, 3) in ('295', '296', '297', '298', '300',
-        '311') or substr(apcd.MED_ICD9, 1, 3) in ('295', '296', '297', '298',
-        '300', '311') or substr(apcd.MED_ICD10, 1, 3) in ('295', '296', '297',
-        '298', '300', '311') or substr(apcd.MED_ICD11, 1, 3) in ('295', '296',
-        '297', '298', '300', '311') or substr(apcd.MED_ICD12, 1, 3) in ('295',
-        '296', '297', '298', '300', '311') or substr(apcd.MED_ICD13, 1, 3) in
-        ('295', '296', '297', '298', '300', '311') or substr(apcd.MED_ICD14, 1,
-        3) in ('295', '296', '297', '298', '300', '311') or
-        substr(apcd.MED_ICD15, 1, 3) in ('295', '296', '297', '298', '300',
-        '311') or substr(apcd.MED_ICD16, 1, 3) in ('295', '296', '297', '298',
-        '300', '311') or substr(apcd.MED_ICD17, 1, 3) in ('295', '296', '297',
-        '298', '300', '311') or substr(apcd.MED_ICD18, 1, 3) in ('295', '296',
-        '297', '298', '300', '311') or substr(apcd.MED_ICD19, 1, 3) in ('295',
-        '296', '297', '298', '300', '311') or substr(apcd.MED_ICD20, 1, 3) in
-        ('295', '296', '297', '298', '300', '311') or substr(apcd.MED_ICD21, 1,
-        3) in ('295', '296', '297', '298', '300', '311') or
-        substr(apcd.MED_ICD22, 1, 3) in ('295', '296', '297', '298', '300',
-        '311') or substr(apcd.MED_ICD23, 1, 3) in ('295', '296', '297', '298',
-        '300', '311') or substr(apcd.MED_ICD24, 1, 3) in ('295', '296', '297',
-        '298', '300', '311') or substr(apcd.MED_ICD25, 1, 3) in ('295', '296',
-        '297', '298', '300', '311') or substr(apcd.MED_DIS_DIAGNOSIS, 1, 3) in
-        ('295', '296', '297', '298', '300', '311') then 1 else 0 end as
-        MENTAL_HEALTH_DIAG from FINAL_COHORT left join PHDAPCD.MOUD_MEDICAL as
-        apcd on FINAL_COHORT.ID=apcd.ID;
-quit;
+PROC SQL;
+    CREATE TABLE MENTAL_HEALTH_COHORT(WHERE=(MENTAL_HEALTH_DIAG=1)) AS
+    SELECT
+        DISTINCT FINAL_COHORT.ID, 
+        CASE
+            WHEN
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ECODE
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ADM_DIAGNOSIS
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD1
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD2
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD3
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD4
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD5
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD6
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD7
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD8
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD9
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD10
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD11
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD12
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD13
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD14
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD15
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD16
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD17
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD18
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD19
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD20
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD21
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD22
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD23
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD24
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_ICD25
+            ) > 0 OR
+            prxmatch(
+                '/^F(20|21|22|23|24|25|28|29|30|31|32|33|34|39)/',
+                apcd.MED_DIS_DIAGNOSIS
+            ) > 0 OR 
+            substr(apcd.MED_ECODE, 1, 3) IN 
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ADM_DIAGNOSIS, 1, 3) IN 
+                ('295', '296', '297', '298', '300', '311') OR
+            substr(apcd.MED_ICD1, 1, 3) IN 
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD2, 1, 3) IN 
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD3, 1, 3) IN 
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD4, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD5, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD6, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD7, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR
+            substr(apcd.MED_ICD8, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD9, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD10, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD11, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD12, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD13, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD14, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR
+            substr(apcd.MED_ICD15, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD16, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD17, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD18, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD19, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD20, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD21, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR
+            substr(apcd.MED_ICD22, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD23, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD24, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_ICD25, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311') OR 
+            substr(apcd.MED_DIS_DIAGNOSIS, 1, 3) IN
+                ('295', '296', '297', '298', '300', '311')
+            THEN 1
+            ELSE 0
+        END AS MENTAL_HEALTH_DIAG
+    FROM FINAL_COHORT
+    LEFT JOIN PHDAPCD.MOUD_MEDICAL AS
+        apcd ON FINAL_COHORT.ID=apcd.ID;
+QUIT;
 
-proc sql;
-    create table FINAL_COHORT as select *, case when ID in (select ID from
-        MENTAL_HEALTH_COHORT) then 1 else 0 end as MENTAL_HEALTH_DIAG from
-        FINAL_COHORT;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        *, 
+        CASE
+            WHEN ID IN (
+    SELECT ID
+    FROM MENTAL_HEALTH_COHORT)
+            THEN 1
+            ELSE 0
+        END AS MENTAL_HEALTH_DIAG
+    FROM FINAL_COHORT;
+QUIT;
 
 %let IJI=('3642', '9884', '11281', '11504', '11514', '11594', '421', '4211',
     '4219', 'A382', 'B376', 'I011', 'I059', 'I079', 'I080', 'I083', 'I089',
@@ -1765,48 +2068,85 @@ quit;
     'I800', 'I801', 'I802', 'I803', 'I808', 'I809', '451', '4512', '4518',
     '4519');
 
-proc sql;
-    create table IJI_COHORT(where=(IJI_DIAG=1)) as select distinct
-        FINAL_COHORT.ID, case when apcd.MED_ECODE in &IJI or
-        apcd.MED_ADM_DIAGNOSIS like '4249%' or apcd.MED_ADM_DIAGNOSIS in &IJI or
-        apcd.MED_ICD1 like '4249%' or apcd.MED_ICD1 in &IJI or apcd.MED_ICD2
-        like '4249%' or apcd.MED_ICD2 in &IJI or apcd.MED_ICD3 like '4249%' or
-        apcd.MED_ICD3 in &IJI or apcd.MED_ICD4 like '4249%' or apcd.MED_ICD4 in
-        &IJI or apcd.MED_ICD5 like '4249%' or apcd.MED_ICD5 in &IJI or
-        apcd.MED_ICD6 like '4249%' or apcd.MED_ICD6 in &IJI or apcd.MED_ICD7
-        like '4249%' or apcd.MED_ICD7 in &IJI or apcd.MED_ICD8 like '4249%' or
-        apcd.MED_ICD8 in &IJI or apcd.MED_ICD9 like '4249%' or apcd.MED_ICD9 in
-        &IJI or apcd.MED_ICD10 like '4249%' or apcd.MED_ICD10 in &IJI or
-        apcd.MED_ICD11 like '4249%' or apcd.MED_ICD11 in &IJI or apcd.MED_ICD12
-        like '4249%' or apcd.MED_ICD12 in &IJI or apcd.MED_ICD13 like '4249%' or
-        apcd.MED_ICD13 in &IJI or apcd.MED_ICD14 like '4249%' or apcd.MED_ICD14
-        in &IJI or apcd.MED_ICD15 like '4249%' or apcd.MED_ICD15 in &IJI or
-        apcd.MED_ICD16 like '4249%' or apcd.MED_ICD16 in &IJI or apcd.MED_ICD17
-        like '4249%' or apcd.MED_ICD17 in &IJI or apcd.MED_ICD18 like '4249%' or
-        apcd.MED_ICD18 in &IJI or apcd.MED_ICD19 like '4249%' or apcd.MED_ICD19
-        in &IJI or apcd.MED_ICD20 like '4249%' or apcd.MED_ICD20 in &IJI or
-        apcd.MED_ICD21 like '4249%' or apcd.MED_ICD21 in &IJI or apcd.MED_ICD22
-        like '4249%' or apcd.MED_ICD22 in &IJI or apcd.MED_ICD23 like '4249%' or
-        apcd.MED_ICD23 in &IJI or apcd.MED_ICD24 like '4249%' or apcd.MED_ICD24
-        in &IJI or apcd.MED_ICD25 like '4249%' or apcd.MED_ICD25 in &IJI or
-        apcd.MED_DIS_DIAGNOSIS like '4249%' or apcd.MED_DIS_DIAGNOSIS in &IJI
-        then 1 else 0 end as IJI_DIAG from FINAL_COHORT left join
-        PHDAPCD.MOUD_MEDICAL as apcd on FINAL_COHORT.ID=apcd.ID;
-quit;
+PROC SQL;
+    CREATE TABLE IJI_COHORT(WHERE=(IJI_DIAG=1)) AS
+    SELECT 
+        DISTINCT FINAL_COHORT.ID, 
+        CASE
+            WHEN 
+            apcd.MED_ECODE IN &IJI OR
+            apcd.MED_ADM_DIAGNOSIS LIKE '4249%' OR 
+            apcd.MED_ADM_DIAGNOSIS IN &IJI OR
+            apcd.MED_ICD1 LIKE '4249%' OR apcd.MED_ICD1 IN &IJI OR 
+            apcd.MED_ICD2 LIKE '4249%' OR apcd.MED_ICD2 IN &IJI OR 
+            apcd.MED_ICD3 LIKE '4249%' OR apcd.MED_ICD3 IN &IJI OR 
+            apcd.MED_ICD4 LIKE '4249%' OR apcd.MED_ICD4 IN &IJI OR 
+            apcd.MED_ICD5 LIKE '4249%' OR apcd.MED_ICD5 IN &IJI OR
+            apcd.MED_ICD6 LIKE '4249%' OR apcd.MED_ICD6 IN &IJI OR 
+            apcd.MED_ICD7 LIKE '4249%' OR apcd.MED_ICD7 IN &IJI OR 
+            apcd.MED_ICD8 LIKE '4249%' OR apcd.MED_ICD8 IN &IJI OR 
+            apcd.MED_ICD9 LIKE '4249%' OR apcd.MED_ICD9 IN &IJI OR 
+            apcd.MED_ICD10 LIKE '4249%' OR apcd.MED_ICD10 IN &IJI OR 
+            apcd.MED_ICD11 LIKE '4249%' OR apcd.MED_ICD11 IN &IJI OR 
+            apcd.MED_ICD12 LIKE '4249%' OR apcd.MED_ICD12 IN &IJI OR 
+            apcd.MED_ICD13 LIKE '4249%' OR apcd.MED_ICD13 IN &IJI OR 
+            apcd.MED_ICD14 LIKE '4249%' OR apcd.MED_ICD14 IN &IJI OR 
+            apcd.MED_ICD15 LIKE '4249%' OR apcd.MED_ICD15 IN &IJI OR
+            apcd.MED_ICD16 LIKE '4249%' OR apcd.MED_ICD16 IN &IJI OR 
+            apcd.MED_ICD17 LIKE '4249%' OR apcd.MED_ICD17 IN &IJI OR 
+            apcd.MED_ICD18 LIKE '4249%' OR apcd.MED_ICD18 IN &IJI OR 
+            apcd.MED_ICD19 LIKE '4249%' OR apcd.MED_ICD19 IN &IJI OR 
+            apcd.MED_ICD20 LIKE '4249%' OR apcd.MED_ICD20 IN &IJI OR
+            apcd.MED_ICD21 LIKE '4249%' OR apcd.MED_ICD21 IN &IJI OR 
+            apcd.MED_ICD22 LIKE '4249%' OR apcd.MED_ICD22 IN &IJI OR 
+            apcd.MED_ICD23 LIKE '4249%' OR apcd.MED_ICD23 IN &IJI OR 
+            apcd.MED_ICD24 LIKE '4249%' OR apcd.MED_ICD24 IN &IJI OR 
+            apcd.MED_ICD25 LIKE '4249%' OR apcd.MED_ICD25 IN &IJI OR
+            apcd.MED_DIS_DIAGNOSIS LIKE '4249%' OR 
+            apcd.MED_DIS_DIAGNOSIS IN &IJI
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM FINAL_COHORT
+    LEFT JOIN PHDAPCD.MOUD_MEDICAL AS apcd ON FINAL_COHORT.ID=apcd.ID;
+QUIT;
 
-proc sql;
-    create table FINAL_COHORT as select *, case when ID in (select ID from
-        IJI_COHORT) then 1 else 0 end as IJI_DIAG from FINAL_COHORT;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        *, 
+        CASE
+            WHEN 
+            ID IN (
+    SELECT ID
+    FROM IJI_COHORT)
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM FINAL_COHORT;
+QUIT;
 
-proc sql;
-    create table FINAL_COHORT as select FINAL_COHORT.*,
-        min_hiv.DIAGNOSIS_MONTH_HIV, min_hiv.DIAGNOSIS_YEAR_HIV, (case when
-        min_hiv.ID is not null then 1 else 0 end) as HIV_DIAG from FINAL_COHORT
-        left join ( select ID, min(DIAGNOSIS_MONTH_HIV) as DIAGNOSIS_MONTH_HIV,
-        min(DIAGNOSIS_YEAR_HIV) as DIAGNOSIS_YEAR_HIV from PHDHIV.HIV_INC group
-        by ID ) as min_hiv on FINAL_COHORT.ID=min_hiv.ID;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        FINAL_COHORT.*,
+        min_hiv.DIAGNOSIS_MONTH_HIV, 
+        min_hiv.DIAGNOSIS_YEAR_HIV, 
+        (CASE
+            WHEN min_hiv.ID IS NOT NULL
+            THEN 1
+            ELSE 0 END) AS HIV_DIAG
+    FROM FINAL_COHORT
+    LEFT JOIN 
+        (
+    SELECT 
+            ID, 
+            MIN(DIAGNOSIS_MONTH_HIV) AS DIAGNOSIS_MONTH_HIV,
+            MIN(DIAGNOSIS_YEAR_HIV) AS DIAGNOSIS_YEAR_HIV
+    FROM PHDHIV.HIV_INC
+    GROUP BY ID) AS min_hiv 
+        ON FINAL_COHORT.ID=min_hiv.ID;
+QUIT;
 
 %LET OTHER_SUBSTANCE_USE=('2910', '2911', '2912', '2913', '2914', '2915',
     '2918', '29181', '29182', '29189', '2919', '30300', '30301', '30302',
@@ -1843,40 +2183,64 @@ quit;
     '96979', '97081', '97089', 'E8542', 'E8543', 'E8552', 'T43691A', 'T43694A'
     /* Stimulants */);
 
-proc sql;
-    create table OTHER_SUBSTANCE_USE_COHORT(where=(OTHER_SUBSTANCE_USE=1)) as
-        select distinct FINAL_COHORT.ID, case when apcd.MED_ECODE in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ADM_DIAGNOSIS in &OTHER_SUBSTANCE_USE
-        or apcd.MED_ICD1 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD2 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD3 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD4 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD5 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD6 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD7 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD8 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD9 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD10 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD11 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD12 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD13 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD14 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD15 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD16 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD17 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD18 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD19 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD20 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD21 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD22 in &OTHER_SUBSTANCE_USE or apcd.MED_ICD23 in
-        &OTHER_SUBSTANCE_USE or apcd.MED_ICD24 in &OTHER_SUBSTANCE_USE or
-        apcd.MED_ICD25 in &OTHER_SUBSTANCE_USE or apcd.MED_DIS_DIAGNOSIS in
-        &OTHER_SUBSTANCE_USE or (BSAS.CLT_ENR_PRIMARY_DRUG in (1,2,3,10,11,12)
-        or BSAS.CLT_ENR_SECONDARY_DRUG in (1,2,3,10,11,12) or
-        BSAS.CLT_ENR_TERTIARY_DRUG in (1,2,3,10,11,12)) then 1 else 0 end as
-        OTHER_SUBSTANCE_USE from FINAL_COHORT left join PHDAPCD.MOUD_MEDICAL as
-        apcd on FINAL_COHORT.ID=apcd.ID left join PHDBSAS.BSAS as bsas on
-        FINAL_COHORT.ID=bsas.ID;
-quit;
+PROC SQL;
+    CREATE TABLE OTHER_SUBSTANCE_USE_COHORT(WHERE=(OTHER_SUBSTANCE_USE=1)) AS
+    SELECT DISTINCT
+        FINAL_COHORT.ID,
+        CASE
+            WHEN apcd.MED_ECODE IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ADM_DIAGNOSIS IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD1 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD2 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD3 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD4 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD5 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD6 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD7 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD8 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD9 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD10 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD11 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD12 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD13 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD14 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD15 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD16 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD17 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD18 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD19 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD20 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD21 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD22 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD23 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD24 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_ICD25 IN &OTHER_SUBSTANCE_USE
+                OR apcd.MED_DIS_DIAGNOSIS IN &OTHER_SUBSTANCE_USE
+                OR (
+                    BSAS.CLT_ENR_PRIMARY_DRUG IN (1,2,3,10,11,12)
+                    OR BSAS.CLT_ENR_SECONDARY_DRUG IN (1,2,3,10,11,12)
+                    OR BSAS.CLT_ENR_TERTIARY_DRUG IN (1,2,3,10,11,12)
+                )
+            THEN 1
+            ELSE 0
+        END AS OTHER_SUBSTANCE_USE
+    FROM FINAL_COHORT
+    LEFT JOIN PHDAPCD.MOUD_MEDICAL AS apcd
+        ON FINAL_COHORT.ID=apcd.ID
+    LEFT JOIN PHDBSAS.BSAS AS bsas
+        ON FINAL_COHORT.ID=bsas.ID;
+QUIT;
 
-proc sql;
-    create table FINAL_COHORT as select *, case when ID in (select ID from
-        OTHER_SUBSTANCE_USE_COHORT) then 1 else 0 end as OTHER_SUBSTANCE_USE
-        from FINAL_COHORT;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        *, 
+        CASE WHEN ID IN (SELECT ID FROM OTHER_SUBSTANCE_USE_COHORT)
+            THEN 1
+            ELSE 0
+        END AS OTHER_SUBSTANCE_USE
+    FROM FINAL_COHORT;
+QUIT;
 
 PROC SORT DATA=PHDHEPC.HCV;
     BY ID EVENT_DATE_HCV;
@@ -1895,32 +2259,48 @@ DATA HCV_STATUS;
 RUN;
 
 PROC SQL;
-    CREATE TABLE IDU_STATUS AS SELECT ID, CASE WHEN SUM(EVER_IDU_HCV=1) > 0 THEN
-        1 WHEN SUM(EVER_IDU_HCV=0) > 0 AND SUM(EVER_IDU_HCV=1) <= 0 THEN 0 WHEN
-        SUM(EVER_IDU_HCV=9) > 0 AND SUM(EVER_IDU_HCV=0) <= 0 AND
-        SUM(EVER_IDU_HCV=1) <= 0 THEN 9 ELSE 9 END AS EVER_IDU_HCV FROM
-        PHDHEPC.HCV GROUP BY ID;
+    CREATE TABLE IDU_STATUS AS
+    SELECT ID, 
+        CASE WHEN SUM(EVER_IDU_HCV=1) > 0
+            THEN 1 
+                WHEN 
+                    SUM(EVER_IDU_HCV=0) > 0 AND SUM(EVER_IDU_HCV=1) <= 0
+            THEN 0 
+                WHEN 
+                    SUM(EVER_IDU_HCV=9) > 0 AND 
+                    SUM(EVER_IDU_HCV=0) <= 0 AND
+                    SUM(EVER_IDU_HCV=1) <= 0
+            THEN 9
+            ELSE 9
+        END AS EVER_IDU_HCV
+    FROM PHDHEPC.HCV
+    GROUP BY ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE HCV_STATUS AS SELECT A.*, B.EVER_IDU_HCV FROM HCV_STATUS A LEFT
-        JOIN IDU_STATUS B ON A.ID=B.ID;
+    CREATE TABLE HCV_STATUS AS
+    SELECT A.*, B.EVER_IDU_HCV
+    FROM HCV_STATUS A
+    LEFT JOIN IDU_STATUS B ON A.ID=B.ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE FINAL_COHORT AS SELECT * FROM FINAL_COHORT LEFT JOIN HCV_STATUS
+    CREATE TABLE FINAL_COHORT AS
+    SELECT *
+    FROM FINAL_COHORT
+    LEFT JOIN HCV_STATUS
         ON HCV_STATUS.ID=FINAL_COHORT.ID;
 QUIT;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
+    if EVER_IDU_HCV=1 OR IJI_DIAG=1 then IDU_EVIDENCE=1;
     else IDU_EVIDENCE=0;
-run;
+RUN;
 
 proc sort data=FINAL_COHORT;
     by ID oud_year oud_month;
-run;
+RUN;
 
 DATA apcd;
     SET PHDAPCD.ME_MTH;
@@ -1928,14 +2308,14 @@ RUN;
 
 proc sort data=apcd;
     by ID ME_MEM_YEAR ME_MEM_MONTH;
-run;
+RUN;
 
 data closest_insurance;
     length closest_past_type closest_future_type closest_type $2;
     length closest_past_zip closest_future_zip closest_zip $10;
     format closest_past_zip closest_future_zip closest_zip $5.;
 
-    merge FINAL_COHORT (in=a) apcd (in=b);
+    merge FINAL_COHORT (IN=a) apcd (IN=b);
     by ID;
 
     if a;
@@ -1959,8 +2339,8 @@ data closest_insurance;
         found_exact_match=0;
     end;
 
-    /* If claim is from the exact same month/year, take the first one and stop searching */
-    if ME_MEM_YEAR=EVENT_YEAR_HCV and ME_MEM_MONTH=EVENT_MONTH_HCV then do;
+    /* If claim IS from the exact same month/year, take the first one AND stop searching */
+    if ME_MEM_YEAR=EVENT_YEAR_HCV AND ME_MEM_MONTH=EVENT_MONTH_HCV then do;
         if found_exact_match=0 then do;
             closest_type=ME_INSURANCE_PRODUCT;
             closest_zip=RES_ZIP_APCD_ME;
@@ -1972,11 +2352,11 @@ data closest_insurance;
     /* Only process past/future claims if no exact match was found */
     else if found_exact_match=0 then do;
         /* Identify the closest past claim */
-        if ME_MEM_YEAR < EVENT_YEAR_HCV or (ME_MEM_YEAR=EVENT_YEAR_HCV and
+        if ME_MEM_YEAR < EVENT_YEAR_HCV OR (ME_MEM_YEAR=EVENT_YEAR_HCV AND
             ME_MEM_MONTH < EVENT_MONTH_HCV) then do;
             past_diff=(EVENT_YEAR_HCV - ME_MEM_YEAR) * 12 + (EVENT_MONTH_HCV -
                 ME_MEM_MONTH);
-            if min_past_diff=. or past_diff < min_past_diff then do;
+            if min_past_diff=. OR past_diff < min_past_diff then do;
                 min_past_diff=past_diff;
                 closest_past_date=ME_MEM_YEAR * 100 + ME_MEM_MONTH;
                 closest_past_type=ME_INSURANCE_PRODUCT;
@@ -1988,7 +2368,7 @@ data closest_insurance;
         else do;
             future_diff=(ME_MEM_YEAR - EVENT_YEAR_HCV) * 12 + (ME_MEM_MONTH -
                 EVENT_MONTH_HCV);
-            if min_future_diff=. or future_diff < min_future_diff then do;
+            if min_future_diff=. OR future_diff < min_future_diff then do;
                 min_future_diff=future_diff;
                 closest_future_date=ME_MEM_YEAR * 100 + ME_MEM_MONTH;
                 closest_future_type=ME_INSURANCE_PRODUCT;
@@ -1997,7 +2377,7 @@ data closest_insurance;
         end;
     end;
 
-    if last.ID and found_exact_match=0 then do;
+    if last.ID AND found_exact_match=0 then do;
         /* Ensure only one claim per ID */
         if min_past_diff ne . then do;
             closest_date=closest_past_date;
@@ -2014,23 +2394,23 @@ data closest_insurance;
         if closest_type ne "" then output;
     end;
 
-run;
+RUN;
 
 data final_output;
     set closest_insurance;
     keep ID EVENT_YEAR_HCV EVENT_MONTH_HCV closest_type closest_zip;
-run;
+RUN;
 
 proc sort data=final_output;
     by ID;
-run;
+RUN;
 
 data FINAL_COHORT;
-    merge FINAL_COHORT (in=a) final_output (keep=ID closest_type closest_zip
+    merge FINAL_COHORT (IN=a) final_output (keep=ID closest_type closest_zip
         rename=(closest_type=INSURANCE));
     by ID;
     if a;
-run;
+RUN;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
@@ -2798,11 +3178,11 @@ data FINAL_COHORT;
     else if closest_zip="02673" then RES_CODE=351;
     else if closest_zip="02675" then RES_CODE=351;
     else if missing(closest_zip) then RES_CODE=999;
-run;
+RUN;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
-    if RES_CODE in (1,2,3,5,7,8,9,10,14,16,17,18,20,23,25,26,30,31,
+    if RES_CODE IN (1,2,3,5,7,8,9,10,14,16,17,18,20,23,25,26,30,31,
         32,35,36,40,42,44,46,48,49,50,52,56,57,61,65,67,71,72,73,75,79,
         80,82,83,85,87,88,93,94,95,96,97,99,100,101,103,105,107,110,115,
         116,119,122,123,126,128,131,133,134,136,137,138,139,141,142,144,
@@ -2815,7 +3195,7 @@ data FINAL_COHORT;
         317,320,321,325,328,329,330,333,334,335,336,338,339,342,344,
         346,347,348,350,351) then rural=0;
 
-    else if RES_CODE in (4,11,12,13,19,21,22,24,27,28,33,34,37,38,39,
+    else if RES_CODE IN (4,11,12,13,19,21,22,24,27,28,33,34,37,38,39,
         41,43,45,51,54,55,58,59,60,64,68,69,70,74,76,77,78,81,84,86,92,
         102,108,111,112,117,118,120,125,127,132,135,140,143,147,148,154,
         157,169,173,179,183,191,194,200,205,212,222,224,227,228,230,240,
@@ -2823,11 +3203,11 @@ data FINAL_COHORT;
         287,289,290,294,297,299,303,306,309,311,313,322,323,324,331,332,
         337,340, 343,345,349) then rural=1;
 
-    else if RES_CODE in (6,104,15,29,47,53,62,63,66,89,90,91,98,106,
+    else if RES_CODE IN (6,104,15,29,47,53,62,63,66,89,90,91,98,106,
         109,113,114,121,124,129,130,150,152,156,190,192,193,195,197,202,
         203,204,209,217,221,223,225,233,234,235,237,242,253,260,267,268,
         283,296,300,302,312,318,319,326,327,341) then rural=2;
-run;
+RUN;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
@@ -2835,7 +3215,7 @@ data FINAL_COHORT;
     else if rural=1 then rural_group='Rural';
     else if rural=2 then rural_group='Rural';
     else rural_group='Unknown';
-run;
+RUN;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
@@ -2844,7 +3224,7 @@ data FINAL_COHORT;
     else if INSURANCE=2 then INSURANCE_CAT='Medicaid';
     else if INSURANCE=3 then INSURANCE_CAT='Medicare';
     else INSURANCE_CAT='Other/Missing';
-run;
+RUN;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
@@ -2852,41 +3232,41 @@ data FINAL_COHORT;
     else if CONFIRMED_HCV_INDICATOR=0 then CONFIRMED_HCV_INDICATOR=2;
     else if CONFIRMED_HCV_INDICATOR=. then CONFIRMED_HCV_INDICATOR=0;
     else CONFIRMED_HCV_INDICATOR=999;
-run;
+RUN;
 
 proc format;
     value flagf 0='No' 1='Yes' 9='Unknown';
 
     value raceef 1='White Non-Hispanic' 2='Black non-Hispanic' 3=
         'Asian/PI non-Hispanic' 4='Hispanic' 5=
-        'American Indian or Other non-Hispanic' 9='Missing' 99=
+        'American Indian OR Other non-Hispanic' 9='Missing' 99=
         'Not an MA resident';
 
     value hcv_reportf 0="No Case Report" 1="Confirmed" 2="Probable";
 
     VALUE age_grps 1='15-18' 2='19-25' 3='26-30' 4='31-35' 5='36-45';
 
-run;
+RUN;
 
 data FINAL_COHORT;
     set FINAL_COHORT;
     agegrp_num=input(agegrp, 8.);
-run;
+RUN;
 
 proc means data=FINAL_COHORT;
     var oud_age;
     output out=mean_age(drop=_TYPE_ _FREQ_) mean=mean_age;
-run;
+RUN;
 
 proc sort data=FINAL_COHORT;
     by BIRTH_INDICATOR;
-run;
+RUN;
 
 proc means data=FINAL_COHORT;
     by BIRTH_INDICATOR;
     var oud_age;
     output out=mean_age(drop=_TYPE_ _FREQ_) mean=mean_age;
-run;
+RUN;
 
 %macro Table1Freqs(var, format);
     title "Table 1, Unstratified";
@@ -2894,7 +3274,7 @@ run;
     proc freq data=FINAL_COHORT;
         tables &var / missing norow nopercent nocol;
         format &var &format.;
-    run;
+    RUN;
 %mend;
 
 %Table1Freqs(FINAL_RE, raceef.);
@@ -2919,14 +3299,14 @@ run;
     /* Sort the dataset by BIRTH_INDICATOR */
     proc sort data=FINAL_COHORT;
         by BIRTH_INDICATOR;
-    run;
+    RUN;
 
     /* Run PROC FREQ with BY statement */
     proc freq data=FINAL_COHORT;
         by BIRTH_INDICATOR;
         tables &var / missing norow nopercent nocol;
         format &var &format.;
-    run;
+    RUN;
 %mend;
 
 %Table1StrataFreqs(FINAL_RE, raceef.);
@@ -2945,12 +3325,19 @@ run;
 %Table1StrataFreqs(INSURANCE_CAT);
 %Table1StrataFreqs(rural_group);
 
-proc sql;
-    create table FINAL_COHORT as select FINAL_COHORT.*, (case when moud.ID is
-        not null then 1 else 0 end) as EVER_MOUD from FINAL_COHORT left join
-        (select distinct ID from PHDSPINE.MOUD3 where DATE_START_YEAR_MOUD >=
-        2014) as moud on FINAL_COHORT.ID=moud.ID;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        FINAL_COHORT.*, 
+        (CASE WHEN moud.ID IS NOT NULL THEN 1 ELSE 0 END) AS EVER_MOUD
+    FROM FINAL_COHORT
+    LEFT JOIN
+        (
+            SELECT DISTINCT ID 
+            FROM PHDSPINE.MOUD3 WHERE DATE_START_YEAR_MOUD >= 2014
+        ) AS moud 
+        ON FINAL_COHORT.ID=moud.ID;
+QUIT;
 
 %macro Table2MOUD(var, ref=);
     title "Table 2, Crude";
@@ -2959,7 +3346,7 @@ quit;
         class &var (ref=&ref);
         model EVER_MOUD(event='1')=&var / dist=binary link=logit solution
             oddsratio;
-    run;
+    RUN;
 %mend;
 
 %Table2MOUD(FINAL_RE, ref='1');
@@ -2967,7 +3354,7 @@ quit;
 %Table2MOUD(EVER_INCARCERATED, ref='0');
 %Table2MOUD(HOMELESS_HISTORY_GROUP, ref='No');
 %Table2MOUD(LANGUAGE_SPOKEN_GROUP, ref='English');
-%Table2MOUD(EDUCATION_GROUP, ref='HS or less');
+%Table2MOUD(EDUCATION_GROUP, ref='HS OR less');
 %Table2MOUD(HIV_DIAG, ref='0');
 %Table2MOUD(CONFIRMED_HCV_INDICATOR, ref='0');
 %Table2MOUD(IJI_DIAG, ref='0');
@@ -2978,11 +3365,14 @@ quit;
 %Table2MOUD(INSURANCE_CAT, ref='Medicaid');
 %Table2MOUD(rural_group, ref='Urban');
 
-proc sql;
-    create table FINAL_COHORT as select A.*, (case when B.ID is not null then 1
-        else 0 end) as EVER_MOUD_CLEAN from FINAL_COHORT as A left join
-        moud_starts as B on A.ID=B.ID;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        A.*, 
+        (CASE WHEN B.ID IS NOT NULL THEN 1 ELSE 0 END) AS EVER_MOUD_CLEAN
+    FROM FINAL_COHORT AS A
+    LEFT JOIN moud_starts AS B ON A.ID=B.ID;
+QUIT;
 
 %macro Table2MOUD(var, ref=);
     title "Table 2, Crude";
@@ -2991,7 +3381,7 @@ quit;
         class &var (ref=&ref);
         model EVER_MOUD_CLEAN(event='1')=&var / dist=binary link=logit solution
             oddsratio;
-    run;
+    RUN;
 %mend;
 
 %Table2MOUD(FINAL_RE, ref='1');
@@ -2999,7 +3389,7 @@ quit;
 %Table2MOUD(EVER_INCARCERATED, ref='0');
 %Table2MOUD(HOMELESS_HISTORY_GROUP, ref='No');
 %Table2MOUD(LANGUAGE_SPOKEN_GROUP, ref='English');
-%Table2MOUD(EDUCATION_GROUP, ref='HS or less');
+%Table2MOUD(EDUCATION_GROUP, ref='HS OR less');
 %Table2MOUD(HIV_DIAG, ref='0');
 %Table2MOUD(CONFIRMED_HCV_INDICATOR, ref='0');
 %Table2MOUD(IJI_DIAG, ref='0');
@@ -3017,7 +3407,7 @@ quit;
         class &var (ref=&ref);
         model EVER_6MO(event='1')=&var / dist=binary link=logit solution
             oddsratio;
-    run;
+    RUN;
 %mend;
 
 %Table2MOUD(FINAL_RE, ref='1');
@@ -3025,7 +3415,7 @@ quit;
 %Table2MOUD(EVER_INCARCERATED, ref='0');
 %Table2MOUD(HOMELESS_HISTORY_GROUP, ref='No');
 %Table2MOUD(LANGUAGE_SPOKEN_GROUP, ref='English');
-%Table2MOUD(EDUCATION_GROUP, ref='HS or less');
+%Table2MOUD(EDUCATION_GROUP, ref='HS OR less');
 %Table2MOUD(HIV_DIAG, ref='0');
 %Table2MOUD(CONFIRMED_HCV_INDICATOR, ref='0');
 %Table2MOUD(IJI_DIAG, ref='0');
@@ -3036,12 +3426,20 @@ quit;
 %Table2MOUD(INSURANCE_CAT, ref='Medicaid');
 %Table2MOUD(rural_group, ref='Urban');
 
-proc sql;
-    create table FINAL_COHORT as select FINAL_COHORT.*, (case when od.ID is not
-        null then 1 else 0 end) as EVER_OD from FINAL_COHORT left join (select
-        distinct ID from PHDSPINE.OVERDOSE where OD_YEAR >= 2014) as od on
-        FINAL_COHORT.ID=od.ID;
-quit;
+PROC SQL;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        FINAL_COHORT.*, 
+        (CASE WHEN od.ID IS NOT NULL THEN 1 ELSE 0 END) AS EVER_OD
+    FROM FINAL_COHORT
+    LEFT JOIN 
+        (
+            SELECT DISTINCT ID
+            FROM PHDSPINE.OVERDOSE
+            WHERE OD_YEAR >= 2014
+        ) AS od 
+        ON FINAL_COHORT.ID=od.ID;
+QUIT;
 
 %macro Table2OD(var, ref=);
     title "Table 2, Crude";
@@ -3050,7 +3448,7 @@ quit;
         class &var (ref=&ref);
         model EVER_OD(event='1')=&var / dist=binary link=logit solution
             oddsratio;
-    run;
+    RUN;
 %mend;
 
 %Table2OD(FINAL_RE, ref='1');
@@ -3058,40 +3456,7 @@ quit;
 %Table2OD(EVER_INCARCERATED, ref='0');
 %Table2OD(HOMELESS_HISTORY_GROUP, ref='No');
 %Table2OD(LANGUAGE_SPOKEN_GROUP, ref='English');
-%Table2OD(EDUCATION_GROUP, ref='HS or less');
-%Table2OD(HIV_DIAG, ref='0');
-%Table2OD(CONFIRMED_HCV_INDICATOR, ref='0');
-%Table2OD(IJI_DIAG, ref='0');
-%Table2OD(EVER_IDU_HCV, ref='0');
-%Table2OD(IDU_EVIDENCE, ref='0');
-%Table2OD(MENTAL_HEALTH_DIAG, ref='0');
-%Table2OD(OTHER_SUBSTANCE_USE, ref='0');
-%Table2OD(INSURANCE_CAT, ref='Medicaid');
-%Table2OD(rural_group, ref='Urban');
-
-proc sql;
-    create table FINAL_COHORT as select FINAL_COHORT.*, (case when fod.ID is not
-        null then 1 else 0 end) as EVER_FOD from FINAL_COHORT left join (select
-        distinct ID from PHDSPINE.OVERDOSE where FATAL_OD_DEATH=1) as fod on
-        FINAL_COHORT.ID=fod.ID;
-quit;
-
-%macro Table2OD(var, ref=);
-    title "Table 2, Crude";
-
-    proc glimmix data=FINAL_COHORT noclprint noitprint;
-        class &var (ref=&ref);
-        model EVER_FOD(event='1')=&var / dist=binary link=logit solution
-            oddsratio;
-    run;
-%mend;
-
-%Table2OD(FINAL_RE, ref='1');
-%Table2OD(agegrp_num, ref='3');
-%Table2OD(EVER_INCARCERATED, ref='0');
-%Table2OD(HOMELESS_HISTORY_GROUP, ref='No');
-%Table2OD(LANGUAGE_SPOKEN_GROUP, ref='English');
-%Table2OD(EDUCATION_GROUP, ref='HS or less');
+%Table2OD(EDUCATION_GROUP, ref='HS OR less');
 %Table2OD(HIV_DIAG, ref='0');
 %Table2OD(CONFIRMED_HCV_INDICATOR, ref='0');
 %Table2OD(IJI_DIAG, ref='0');
@@ -3103,18 +3468,59 @@ quit;
 %Table2OD(rural_group, ref='Urban');
 
 PROC SQL;
-    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids FROM
-        FINAL_COHORT;
+    CREATE TABLE FINAL_COHORT AS
+    SELECT 
+        FINAL_COHORT.*, 
+        (CASE WHEN fod.ID IS NOT NULL THEN 1 ELSE 0 END) AS EVER_FOD
+    FROM FINAL_COHORT
+    LEFT JOIN 
+        (
+            SELECT DISTINCT ID
+            FROM PHDSPINE.OVERDOSE
+            WHERE FATAL_OD_DEATH=1
+        ) AS fod 
+        ON FINAL_COHORT.ID=fod.ID;
 QUIT;
 
-%put Number of unique Infant IDs in FINAL_COHORT table: &num_unique_ids;
+%macro Table2OD(var, ref=);
+    title "Table 2, Crude";
+
+    proc glimmix data=FINAL_COHORT noclprint noitprint;
+        class &var (ref=&ref);
+        model EVER_FOD(event='1')=&var / dist=binary link=logit solution
+            oddsratio;
+    RUN;
+%mend;
+
+%Table2OD(FINAL_RE, ref='1');
+%Table2OD(agegrp_num, ref='3');
+%Table2OD(EVER_INCARCERATED, ref='0');
+%Table2OD(HOMELESS_HISTORY_GROUP, ref='No');
+%Table2OD(LANGUAGE_SPOKEN_GROUP, ref='English');
+%Table2OD(EDUCATION_GROUP, ref='HS OR less');
+%Table2OD(HIV_DIAG, ref='0');
+%Table2OD(CONFIRMED_HCV_INDICATOR, ref='0');
+%Table2OD(IJI_DIAG, ref='0');
+%Table2OD(EVER_IDU_HCV, ref='0');
+%Table2OD(IDU_EVIDENCE, ref='0');
+%Table2OD(MENTAL_HEALTH_DIAG, ref='0');
+%Table2OD(OTHER_SUBSTANCE_USE, ref='0');
+%Table2OD(INSURANCE_CAT, ref='Medicaid');
+%Table2OD(rural_group, ref='Urban');
+
+PROC SQL;
+    SELECT COUNT(DISTINCT ID) AS Number_of_Unique_IDs INTO :num_unique_ids
+    FROM FINAL_COHORT;
+QUIT;
+
+%put Number of unique Infant IDs IN FINAL_COHORT table: &num_unique_ids;
 
 %macro ChiSquareTest(var1, var2);
-    title "Chi-Square Test between &var1 and &var2";
+    title "Chi-Square Test between &var1 AND &var2";
 
     proc freq data=FINAL_COHORT;
         tables &var1*(&var2) / chisq nopercent nocol;
-    run;
+    RUN;
     title;
 %mend;
 
@@ -3147,25 +3553,27 @@ QUIT;
 /*  Part 4: Calculate MOUD Rates */
 /*===============================*/
 /*  Goal:
-Characterize and model the differecnes between pregnant and non-pregnant women's
-initiation and cessation of opioid use disorder treatment (MOUD) episodes
+Characterize AND model the differecnes between pregnant AND non-pregnant women's
+initiation AND cessation of opioid use disorder treatment (MOUD) episodes
 
-This portion of the code processes the `PHDSPINE.MOUD3` dataset by first sorting and
-creating a unique `episode_id` for each treatment episode based on treatment start and end dates,
-with episodes being flagged when a significant gap is detected between consecutive treatment episodes.
-It also merges treatment episode data, calculates start and end months/years, removes short treatment
-episodes based on the specified leniency, and eliminates any overlapping episodes. The dataset is then
-cleaned for missing values and sorted for further analysis */
+This portion of the code processes the `PHDSPINE.MOUD3` dataset by first sorting AND
+creating a unique `episode_id` for each treatment episode based ON treatment start AND end dates,
+with episodes being flagged when a significant gap IS detected between consecutive treatment episodes.
+It also merges treatment episode data, calculates start AND end months/years, removes short treatment
+episodes based ON the specified leniency, AND eliminates any overlapping episodes. The dataset IS then
+cleaned for missing values AND sorted for further analysis */
 /*====================*/
 /* 1. Identifying Missing IDs */
 /*====================*/
 
-/* This step identifies IDs in the FINAL_COHORT that do not have matching records in the cleaned
-`moud` dataset. The result is saved in the `missing_ids` table. */
-proc sql;
-    create table missing_ids as select ID from FINAL_COHORT where
-        EVER_MOUD_CLEAN=0;
-quit;
+/* This step identifies IDs IN the FINAL_COHORT that do not have matching records IN the cleaned
+`moud` dataset. The result IS saved IN the `missing_ids` table. */
+PROC SQL;
+    CREATE TABLE missing_ids AS
+    SELECT ID
+    FROM FINAL_COHORT
+    WHERE EVER_MOUD_CLEAN=0;
+QUIT;
 
 /*====================*/
 /* 2. Creating Two MOUD Datasets */
@@ -3177,54 +3585,64 @@ DATA moud_duration;
     SET moud_demo;
 RUN;
 
-/* This step makes an expanded `moud_full` dataset by taking the cleaned moud dataset and creating additional observations
-for those in the OUD cohort that did not have a clean MOUD episode. This dataset will be used to assess MOUD initiation
+/* This step makes an expanded `moud_full` dataset by taking the cleaned moud dataset AND creating additional observations
+for those IN the OUD cohort that did not have a clean MOUD episode. This dataset will be used to assess MOUD initiation
 because all with OUD contiribute eligblie person-time toward MOUD initation */
 DATA moud_full;
     SET moud_demo;
 RUN;
 
-proc sql;
-    insert into moud_full (ID) select ID from missing_ids;
-quit;
+PROC SQL;
+    INSERT INTO moud_full (ID)
+    SELECT ID
+    FROM missing_ids;
+QUIT;
 
 /*=====================================*/
 /* 3. Prepare Pregnancy Tables         */
 /*=====================================*/
 
-/* This portion processes birth and infant data to generate monthly pregnancy and postpartum period flags for each birth. It first extracts relevant birth records from `PHDBIRTH.BIRTH_MOM` based on a specified year range and
-retrieves gestational age from `PHDBIRTH.BIRTH_INFANT`, merging them using `BIRTH_LINK_ID`. The script then estimates pregnancy duration based on gestational age and determines the start and end months of pregnancy.
-It iterates through months to flag each as part of the pregnancy period, then defines postpartum periods (6, 12, 18, and 24 months after birth) with specific flags. The dataset is sorted by mother ID, year, and month,
-keeping only the earliest flag for each month. Finally, the script extracts the start and end years from a macro variable and generates datasets for months (1–12) and the range of years within the study period.
-Thus, the outcome is a long table, where each birth has 108 rows (one row per month Jan 2014-Dec 2022) that is flagged either pregnant or post-partum. */
+/* This portion processes birth AND infant data to generate monthly pregnancy AND postpartum period flags for each birth. It first extracts relevant birth records from `PHDBIRTH.BIRTH_MOM` based ON a specified year range AND
+retrieves gestational age from `PHDBIRTH.BIRTH_INFANT`, merging them using `BIRTH_LINK_ID`. The script then estimates pregnancy duration based ON gestational age AND determines the start AND end months of pregnancy.
+It iterates through months to flag each AS part of the pregnancy period, then defines postpartum periods (6, 12, 18, AND 24 months after birth) with specific flags. The dataset IS sorted by mother ID, year, AND month,
+keeping only the earliest flag for each month. Finally, the script extracts the start AND end years from a macro variable AND generates datasets for months (1–12) AND the range of years within the study period.
+Thus, the outcome IS a long table, where each birth has 108 rows (one row per month Jan 2014-Dec 2022) that IS flagged either pregnant OR post-partum. */
 data all_births;
     set PHDBIRTH.BIRTH_MOM (keep=ID BIRTH_LINK_ID MONTH_BIRTH YEAR_BIRTH
         where=(YEAR_BIRTH IN &year));
-run;
+RUN;
 
 data infants;
     set PHDBIRTH.BIRTH_INFANT (keep=ID BIRTH_LINK_ID GESTATIONAL_AGE);
-run;
+RUN;
 
-proc sql;
-    create table merged_births_infants as select a.ID as MATERNAL_ID,
-        a.BIRTH_LINK_ID, a.MONTH_BIRTH, a.YEAR_BIRTH, b.ID as INFANT_ID,
-        b.GESTATIONAL_AGE from all_births as a left join infants as b on
-        a.BIRTH_LINK_ID=b.BIRTH_LINK_ID;
-quit;
+PROC SQL;
+    CREATE TABLE merged_births_infants AS
+    SELECT 
+        a.ID AS MATERNAL_ID,
+        a.BIRTH_LINK_ID, 
+        a.MONTH_BIRTH, 
+        a.YEAR_BIRTH, 
+        b.ID AS INFANT_ID,
+        b.GESTATIONAL_AGE
+    FROM all_births AS a
+    LEFT JOIN infants AS b ON a.BIRTH_LINK_ID=b.BIRTH_LINK_ID;
+QUIT;
 
 data fetal_deaths_renamed;
     set PHDFETAL.FETALDEATH;
     rename ID=MATERNAL_ID GESTATIONAL_AGE_FD=GESTATIONAL_AGE FETAL_DEATH_MONTH=
         MONTH_BIRTH FETAL_DEATH_YEAR=YEAR_BIRTH MOTHER_AGE_FD=AGE_BIRTH;
-run;
+RUN;
 
-proc sql;
-    create table merged_births_infants as select a.MATERNAL_ID, a.MONTH_BIRTH,
-        a.YEAR_BIRTH, a.GESTATIONAL_AGE from merged_births_infants as a union
-        all select put(b.MATERNAL_ID, $10.), b.MONTH_BIRTH, b.YEAR_BIRTH,
-        b.GESTATIONAL_AGE from fetal_deaths_renamed as b;
-quit;
+PROC SQL;
+    CREATE TABLE merged_births_infants AS
+    SELECT a.MATERNAL_ID, a.MONTH_BIRTH, a.YEAR_BIRTH, a.GESTATIONAL_AGE
+    FROM merged_births_infants AS a UNION ALL
+    SELECT 
+        put(b.MATERNAL_ID, $10.), b.MONTH_BIRTH, b.YEAR_BIRTH, b.GESTATIONAL_AGE
+    FROM fetal_deaths_renamed AS b;
+QUIT;
 
 %let start_year=%scan(%substr(&year,2,%length(&year)-2),1,':');
 %let end_year=%scan(%substr(&year,2,%length(&year)-2),2,':');
@@ -3255,7 +3673,7 @@ data pregnancy_flags;
 
     month=pregnancy_start_month;
     year=pregnancy_start_year;
-    do while ((year < pregnancy_end_year) or (year=pregnancy_end_year and month
+    do while ((year < pregnancy_end_year) OR (year=pregnancy_end_year AND month
         <= pregnancy_end_month));
         flag=1;
         output;
@@ -3286,8 +3704,8 @@ data pregnancy_flags;
             year + 1;
         end;
 
-        do while ((year < post_partum_end_year) or (year=post_partum_end_year
-            and month <= post_partum_end_month));
+        do while ((year < post_partum_end_year) OR (year=post_partum_end_year
+            AND month <= post_partum_end_month));
             flag=post_partum_flags[i];
             output;
 
@@ -3302,7 +3720,7 @@ data pregnancy_flags;
     month=month;
     year=year;
 
-    do while ((year < &end_year) or (year=&end_year and month <= 12));
+    do while ((year < &end_year) OR (year=&end_year AND month <= 12));
         flag=6;
         output;
 
@@ -3314,23 +3732,23 @@ data pregnancy_flags;
     end;
 
     keep MATERNAL_ID pregnancy_start_month pregnancy_start_year month year flag;
-run;
+RUN;
 
 data pregnancy_flags;
     set pregnancy_flags;
     rename MATERNAL_ID=ID;
-run;
+RUN;
 
 proc sort data=pregnancy_flags;
     by ID year month flag;
-run;
+RUN;
 
 data pregnancy_flags;
     set pregnancy_flags;
     by ID year month;
 
     if first.month then output;
-run;
+RUN;
 
 DATA months;
     DO month=1 to 12;
@@ -3349,47 +3767,72 @@ RUN;
 /*=====================================*/
 
 /* This section of the code defines a macro that merges creates the cartesian produce of the input moud datasets for Jan 2014-Dec 2022.
-It merges demographic data from `PHDSPINE.DEMO` to the long dataset, and creates a table that flags the presence of treatment
-episodes across a specified range of months and years. It also merges flags for pregnancy and post-partum periods. The final output includes flags for each month indicating
-the stage of pregnancy or post-partum status, an onoging MOUD episode, an MOUD initation, or an MOUD cessation event for each individual.
-The code potion is wrapped in a macro so that two datasets, moud_init and moud_duration, can be run sequentially through the same data manipulation steps. Dataset moud_init includes
-all IDs in the Maternal OUD cohort (to analyze MOUD initation outcomes since all with OUD are eligible) while dataset moud_duration
-is a subset of only those that had an MOUD episode (to analyze MOUD duration and cessation since being on MOUD is required to eligiblity) */
+It merges demographic data from `PHDSPINE.DEMO` to the long dataset, AND creates a table that flags the presence of treatment
+episodes across a specified range of months AND years. It also merges flags for pregnancy AND post-partum periods. The final output includes flags for each month indicating
+the stage of pregnancy OR post-partum status, an onoging MOUD episode, an MOUD initation, OR an MOUD cessation event for each individual.
+The code potion IS wrapped IN a macro so that two datasets, moud_init AND moud_duration, can be run sequentially through the same data manipulation steps. Dataset moud_init includes
+all IDs IN the Maternal OUD cohort (to analyze MOUD initation outcomes since all with OUD are eligible) while dataset moud_duration
+IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND cessation since being ON MOUD IS required to eligiblity) */
 %macro moud_table_creation(input_dataset);
 
-    /* Create the cartesian product of our input dataset, months, and years to represent every month in our study period */
+    /* Create the cartesian product of our input dataset, months, AND years to represent every month IN our study period */
     PROC SQL;
-        CREATE TABLE moud_table AS SELECT * FROM &input_dataset, months, years;
+        CREATE TABLE moud_table AS
+    SELECT *
+    FROM &input_dataset, months, years;
     QUIT;
 
-    /* Pull in pregnancy and post-partum flags and pregnancy date information */
-    proc sql;
-        create table moud_table as select a.*, case when b.flag is not null then
-            b.flag else 9999 end as preg_flag, case when b.pregnancy_start_month
-            is not null then b.pregnancy_start_month else . end as
-            pregnancy_start_month, case when b.pregnancy_start_year is not null
-            then b.pregnancy_start_year else . end as pregnancy_start_year from
-            moud_table a left join pregnancy_flags b on a.ID=b.ID and a.month=
-            b.month and a.year=b.year;
-    quit;
+    /* Pull IN pregnancy AND post-partum flags AND pregnancy date information */
+    PROC SQL;
+        CREATE TABLE moud_table AS
+    SELECT 
+        a.*, 
+        CASE WHEN b.flag IS NOT NULL
+            THEN b.flag
+            ELSE 9999
+        END AS preg_flag, 
+        CASE WHEN b.pregnancy_start_month
+            IS NOT NULL
+            THEN b.pregnancy_start_month
+            ELSE .
+        END AS pregnancy_start_month, 
+        CASE WHEN b.pregnancy_start_year IS NOT NULL
+            THEN b.pregnancy_start_year
+            ELSE .
+        END AS pregnancy_start_year
+    FROM moud_table a
+    LEFT JOIN pregnancy_flags b 
+        ON a.ID=b.ID AND a.month=b.month AND a.year=b.year;
+    QUIT;
 
     proc sort data=moud_table;
         by ID year month;
-    run;
+    RUN;
 
-    proc sql;
-        create table pregnancy_summary as select ID, min(pregnancy_start_month)
-            as first_preg_month, min(pregnancy_start_year) as first_preg_year
-            from pregnancy_flags group by ID;
-    quit;
+    PROC SQL;
+        CREATE TABLE pregnancy_summary AS
+    SELECT 
+        ID, 
+        MIN(pregnancy_start_month) AS first_preg_month, 
+        MIN(pregnancy_start_year) AS first_preg_year
+    FROM pregnancy_flags
+    GROUP BY ID;
+    QUIT;
 
-    proc sql;
-        create table moud_table as select a.*, coalesce(b.first_preg_month, .)
-            as first_preg_month, coalesce(b.first_preg_year, .) as
-            first_preg_year, case when b.ID is not null then 1 else 0 end as
-            has_pregnancy from moud_table a left join pregnancy_summary b on
+    PROC SQL;
+        CREATE TABLE moud_table AS
+    SELECT 
+        a.*, 
+        coalesce(b.first_preg_month, .) AS first_preg_month, 
+        coalesce(b.first_preg_year, .) AS first_preg_year, 
+        CASE WHEN b.ID IS NOT NULL
+            THEN 1
+            ELSE 0
+        END AS has_pregnancy
+    FROM moud_table a
+    LEFT JOIN pregnancy_summary b ON
             a.ID=b.ID;
-    quit;
+    QUIT;
 
     /* Create a summary dataset with a flag indicating whether a month overlaps with the MOUD episode */
     data moud_summary;
@@ -3401,7 +3844,7 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         if start_month_year <= target_month_year <= end_month_year then
             moud_flag=1;
         else moud_flag=0;
-    run;
+    RUN;
 
     /* Create a dataset with post-treatment overlap flag */
     data moud_spine_posttxt;
@@ -3413,11 +3856,11 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
 
         if target_month_year=end_month_year then posttxt_flag=1;
         else posttxt_flag=0;
-    run;
+    RUN;
 
     proc sort data=moud_summary;
         by ID episode_num year month;
-    run;
+    RUN;
 
     /* Create moud initiation flag */
     data moud_table;
@@ -3432,7 +3875,7 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         end;
 
         if moud_flag=1 then do;
-            if lag_moud_flag=0 or lag_moud_flag=. then moud_init=1;
+            if lag_moud_flag=0 OR lag_moud_flag=. then moud_init=1;
             else if lag_moud_flag=1 then moud_init=0;
         end;
 
@@ -3440,11 +3883,11 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
 
         lag_moud_flag=moud_flag;
 
-    run;
+    RUN;
 
     proc sort data=moud_table;
         by ID episode_num year month;
-    run;
+    RUN;
 
     data moud_spine_preg;
         set moud_table;
@@ -3454,7 +3897,7 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         if first.ID then moud_start_group=.;
 
         /* Only classify MOUD initiations for people with a pregnancy */
-        if moud_init=1 and has_pregnancy=1 then do;
+        if moud_init=1 AND has_pregnancy=1 then do;
 
             if preg_flag=9999 then do;
                 /* Before first pregnancy */
@@ -3464,7 +3907,7 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
                 /* During pregnancy */
                 moud_start_group=2;
             end;
-            else if preg_flag in (2,3,4,5,6) then do;
+            else if preg_flag IN (2,3,4,5,6) then do;
                 /* After pregnancy */
                 moud_start_group=3;
             end;
@@ -3472,53 +3915,65 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
 
         keep episode_num episode_id ID year month moud_init preg_flag
             has_pregnancy moud_start_group;
-    run;
+    RUN;
 
     proc sort data=moud_table;
         by ID year month;
-    run;
+    RUN;
 
     /* Create moud duration variable */
-    proc sql;
-        create table moud_table as select a.*, case when a.moud_flag=0 then 0
-            else b.moud_duration end as moud_duration from moud_table as a left
-            join ( select EPISODE_ID, sum(moud_flag) as moud_duration from
-            moud_table group by EPISODE_ID ) as b on a.EPISODE_ID=b.EPISODE_ID;
-    quit;
+    PROC SQL;
+        CREATE TABLE moud_table AS
+    SELECT 
+        a.*, 
+        CASE WHEN a.moud_flag=0
+            THEN 0
+            ELSE b.moud_duration
+        END AS moud_duration
+    FROM moud_table AS a
+    LEFT JOIN 
+        (
+            SELECT EPISODE_ID, SUM(moud_flag) AS moud_duration
+            FROM moud_table
+            GROUP BY EPISODE_ID 
+        ) AS b 
+        ON a.EPISODE_ID=b.EPISODE_ID;
+    QUIT;
 
     title "MOUD Duration Sum Stats";
 
-    proc sql;
-        create table duration_means as SELECT distinct episode_id,
-            moud_duration, preg_flag from moud_table where moud_duration is not
-            missing and moud_duration ne 0;
-    quit;
+    PROC SQL;
+        CREATE TABLE duration_means AS
+    SELECT DISTINCT episode_id, moud_duration, preg_flag
+    FROM moud_table
+    WHERE moud_duration IS NOT missing AND moud_duration ne 0;
+    QUIT;
 
-    proc means data=duration_means sum mean median std min max q1 q3;
+    proc means data=duration_means SUM mean median std MIN max q1 q3;
         var moud_duration;
-    run;
+    RUN;
 
     proc sort data=duration_means;
         by preg_flag;
-    run;
+    RUN;
 
-    proc means data=duration_means sum mean median std min max q1 q3;
+    proc means data=duration_means SUM mean median std MIN max q1 q3;
         by preg_flag;
         var moud_duration;
-    run;
+    RUN;
     title;
 
     /* Create moud cessation variable */
     data MOUD_TABLE;
         set MOUD_TABLE;
-        if new_end_month=MONTH and new_end_year=YEAR then moud_cessation=1;
+        if new_end_month=MONTH AND new_end_year=YEAR then moud_cessation=1;
         else moud_cessation=0;
-    run;
+    RUN;
 
     data prepared_data;
         set moud_table;
         drop episode_id;
-    run;
+    RUN;
 
     data PREPARED_DATA;
         set PREPARED_DATA;
@@ -3526,65 +3981,86 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         /* Create a unique time index */
         time_index=(year - 2014) * 12 + month;
 
-        /* Categorize individuals based on pregnancy and post-partum status */
+        /* Categorize individuals based ON pregnancy AND post-partum status */
         if preg_flag=1 then group=6; /* Pregnant */
         else if preg_flag=2 then group=5; /* 0-6 months post-partum */
         else if preg_flag=3 then group=4; /* 7-12 months post-partum */
         else if preg_flag=4 then group=3; /* 13-18 months post-partum */
         else if preg_flag=5 then group=3; /* 19-24 months post-partum */
         else if preg_flag=6 then group=2; /* >24 months post-partum */
-        else if preg_flag=9999 and has_pregnancy=1 then group=1;
+        else if preg_flag=9999 AND has_pregnancy=1 then group=1;
         /* Pre-first pregnancy */
-        else if preg_flag=9999 and has_pregnancy=0 then group=0;
+        else if preg_flag=9999 AND has_pregnancy=0 then group=0;
         /* Never pregnant */
-    run;
+    RUN;
 
     /* Reduce from EPISODE_LEVEL to PERSON_LEVEL */
-    proc sql;
-        create table PREPARED_DATA as select distinct ID, month, year, group,
-            max(moud_flag) as moud_flag, max(moud_init) as moud_init,
-            max(moud_duration) as moud_duration, max(moud_cessation) as
-            moud_cessation, min(preg_flag) as preg_flag from PREPARED_DATA group
-            by ID, year, month;
-    quit;
+    PROC SQL;
+        CREATE TABLE PREPARED_DATA AS
+    SELECT 
+        DISTINCT ID, 
+        month, 
+        year,
+        GROUP,
+        max(moud_flag) AS moud_flag, 
+        max(moud_init) AS moud_init,
+        max(moud_duration) AS moud_duration, 
+        max(moud_cessation) AS moud_cessation, 
+        MIN(preg_flag) AS preg_flag
+    FROM PREPARED_DATA
+    GROUP BY ID, year, month;
+    QUIT;
 
     proc sort data=PREPARED_DATA;
         BY ID year month;
-    run;
+    RUN;
 
-    /* Censor on death and assess event temporality with regard to death date (i.e. claims processed after death)  */
-    proc sql;
-        create table deaths_filtered as select ID, YEAR_DEATH, MONTH_DEATH from
-            PHDDEATH.DEATH where YEAR_DEATH in &year;
-    quit;
+    /* Censor ON death AND assess event temporality with regard to death date (i.e. claims processed after death)  */
+    PROC SQL;
+        CREATE TABLE deaths_filtered AS
+    SELECT ID, YEAR_DEATH, MONTH_DEATH
+    FROM PHDDEATH.DEATH
+    WHERE YEAR_DEATH IN &year;
+    QUIT;
 
     proc sort data=PREPARED_DATA;
         by ID year month;
-    run;
+    RUN;
 
-    proc sql;
-        create table PREPARED_DATA as select a.*, b.YEAR_DEATH, b.MONTH_DEATH,
-            case when b.YEAR_DEATH=a.year and b.MONTH_DEATH=a.month then 1 else
-            0 end as death_flag from PREPARED_DATA as a left join
-            deaths_filtered as b on a.ID=b.ID;
-    quit;
+    PROC SQL;
+        CREATE TABLE PREPARED_DATA AS
+    SELECT 
+        a.*, 
+        b.YEAR_DEATH, 
+        b.MONTH_DEATH,
+        CASE WHEN b.YEAR_DEATH=a.year AND b.MONTH_DEATH=a.month
+            THEN 1
+            ELSE 0
+        END AS death_flag
+    FROM PREPARED_DATA AS a
+    LEFT JOIN deaths_filtered AS b ON a.ID=b.ID;
+    QUIT;
 
-    proc sql;
-        create table death_events as select ID, min(year*12 + month) as
-            death_period from PREPARED_DATA where death_flag=1 group by ID;
-    quit;
+    PROC SQL;
+        CREATE TABLE death_events AS
+    SELECT ID, MIN(year*12 + month) AS death_period
+    FROM PREPARED_DATA
+    WHERE death_flag=1
+    GROUP BY ID;
+    QUIT;
 
-    proc sql;
-        create table post_death_counts as select sum(moud_init) as
-            moud_init_before_case from PREPARED_DATA as a inner join
-            death_events as d on a.ID=d.ID where (a.year*12 + a.month) >
-            d.death_period;
-    quit;
+    PROC SQL;
+        CREATE TABLE post_death_counts AS
+    SELECT SUM(moud_init) AS moud_init_before_case
+    FROM PREPARED_DATA AS a
+    INNER JOIN death_events AS d ON a.ID=d.ID
+    WHERE (a.year*12 + a.month) > d.death_period;
+    QUIT;
 
     title "Counts of Events Occurring After Death";
 
     proc print data=post_death_counts noobs;
-    run;
+    RUN;
     title;
 
     data PREPARED_DATA;
@@ -3595,21 +4071,32 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         if first.ID then death_flag_forward=0;
         if death_flag=1 then death_flag_forward=1;
 
-        if death_flag_forward=1 and (year > YEAR_DEATH or (year=YEAR_DEATH and
+        if death_flag_forward=1 AND (year > YEAR_DEATH OR (year=YEAR_DEATH AND
             month > MONTH_DEATH)) then delete;
 
         drop death_flag_forward;
-    run;
+    RUN;
 
-    proc sql;
-        create table CENSORED as select a.*, b.MA2014, b.MA2015, b.MA2016,
-            b.MA2017, b.MA2018, b.MA2019, b.MA2020, b.MA2021, b.MA2022 from
-            PREPARED_DATA as a left join PHDSPINE.DEMO as b on a.ID=b.ID;
-    quit;
+    PROC SQL;
+        CREATE TABLE CENSORED AS
+    SELECT 
+        a.*, 
+        b.MA2014, 
+        b.MA2015, 
+        b.MA2016,
+        b.MA2017, 
+        b.MA2018, 
+        b.MA2019, 
+        b.MA2020, 
+        b.MA2021, 
+        b.MA2022
+    FROM PREPARED_DATA AS a
+    LEFT JOIN PHDSPINE.DEMO AS b ON a.ID=b.ID;
+    QUIT;
 
     proc sort data=CENSORED;
         by ID year month;
-    run;
+    RUN;
 
     data CENSORED2;
         set CENSORED;
@@ -3620,7 +4107,7 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         do yr=2014 to 2022;
             if MAvars[yr]=1 then last_MA_year=yr;
         end;
-    run;
+    RUN;
 
     data CENSORED3;
         set CENSORED2;
@@ -3632,20 +4119,27 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         end;
 
         if missing(last_MA_year) then censored=1;
-    run;
+    RUN;
 
     data PREPARED_DATA;
         set CENSORED3;
         if censored=0;
-    run;
+    RUN;
 
     /* Add covariates for rate stratification  */
     PROC SQL;
-        CREATE TABLE PREPARED_DATA AS SELECT a.*, demographics.FINAL_RE,
-            demographics.FINAL_SEX, demographics.EDUCATION,
-            demographics.EVER_INCARCERATED, demographics.FOREIGN_BORN,
-            demographics.HOMELESS_EVER, demographics.YOB FROM PREPARED_DATA AS a
-            LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
+        CREATE TABLE PREPARED_DATA AS
+    SELECT 
+        a.*, 
+        demographics.FINAL_RE,
+        demographics.FINAL_SEX, 
+        demographics.EDUCATION,
+        demographics.EVER_INCARCERATED, 
+        demographics.FOREIGN_BORN,
+        demographics.HOMELESS_EVER, 
+        demographics.YOB
+    FROM PREPARED_DATA AS a
+    LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
     QUIT;
 
     data PREPARED_DATA;
@@ -3654,64 +4148,87 @@ is a subset of only those that had an MOUD episode (to analyze MOUD duration and
         if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
         else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
         else HOMELESS_HISTORY_GROUP='Unknown';
-    run;
+    RUN;
 
     data PREPARED_DATA;
         set PREPARED_DATA;
         where FINAL_SEX=2;
-    run;
+    RUN;
 
     PROC SQL;
-        CREATE TABLE PREPARED_DATA AS SELECT a.*, cov.IJI_DIAG,
-            cov.OTHER_SUBSTANCE_USE, cov.IDU_EVIDENCE FROM PREPARED_DATA AS a
-            LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
+        CREATE TABLE PREPARED_DATA AS
+    SELECT 
+        a.*, 
+        cov.IJI_DIAG,
+        cov.OTHER_SUBSTANCE_USE, 
+        cov.IDU_EVIDENCE
+    FROM PREPARED_DATA AS a
+    LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
     QUIT;
 
     PROC SQL;
-        CREATE TABLE PREPARED_DATA AS SELECT a.*, cov.agegrp FROM PREPARED_DATA
-            AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
+        CREATE TABLE PREPARED_DATA AS
+    SELECT a.*, cov.agegrp
+    FROM PREPARED_DATA AS a
+    LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
     QUIT;
 
 %mend;
 
 /*=================================================================*/
-/* 5. MOUD Duration Stats and Cessation Rates by Pregnancy Status */
+/* 5. MOUD Duration Stats AND Cessation Rates by Pregnancy Status */
 /*=================================================================*/
-/* This section creates summary tables (`PERSON_TIME` and `PERIOD_SUMMARY`) to calculate the number of eligible cessation periods and actual MOUD cessation events for each individual.
-These tables are merged with demographic data, including variables such as race, sex, education, incarceration history, and homelessness status. Additional variables are created, including an indicator for injection drug use (`IDU_EVIDENCE`) and age groups.
-Next, generates summary tables and calculates MOUD cessation rates overall and by stratified groups, providing confidence intervals for cessation rates. The macro `%calculate_rates` automates the stratified rate calculations across multiple demographic factors. */
+/* This section creates summary tables (`PERSON_TIME` AND `PERIOD_SUMMARY`) to calculate the number of eligible cessation periods AND actual MOUD cessation events for each individual.
+These tables are merged with demographic data, including variables such AS race, sex, education, incarceration history, AND homelessness status. Additional variables are created, including an indicator for injection drug use (`IDU_EVIDENCE`) AND age groups.
+Next, generates summary tables AND calculates MOUD cessation rates overall AND by stratified groups, providing confidence intervals for cessation rates. The macro `%calculate_rates` automates the stratified rate calculations across multiple demographic factors. */
 %moud_table_creation(moud_duration);
 
-proc sql;
-    create table PERSON_TIME as select ID, group, sum(case when moud_flag=1 then
-        1 else 0 end) as eligble_cessation from PREPARED_DATA group by ID,
-        group;
-quit;
+PROC SQL;
+    CREATE TABLE PERSON_TIME AS
+    SELECT 
+        ID,
+        GROUP, 
+        SUM(CASE WHEN moud_flag=1 THEN 1 ELSE 0 END) AS eligble_cessation
+    FROM PREPARED_DATA
+    GROUP BY ID, GROUP;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY as select ID, group, sum(moud_cessation) as
-        moud_stops from PREPARED_DATA group by ID, group;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY AS
+    SELECT 
+        ID,
+        GROUP, 
+        SUM(moud_cessation) AS moud_stops
+    FROM PREPARED_DATA
+    GROUP BY ID, GROUP;
+QUIT;
 
 proc sort data=PERSON_TIME;
     by ID group;
-run;
+RUN;
 
 proc sort data=PERIOD_SUMMARY;
     by ID group;
-run;
+RUN;
 
 data PERIOD_SUMMARY_FINAL;
     merge PERIOD_SUMMARY PERSON_TIME;
     by ID group;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, demographics.FINAL_RE,
-        demographics.FINAL_SEX, demographics.EDUCATION,
-        demographics.EVER_INCARCERATED, demographics.FOREIGN_BORN,
-        demographics.HOMELESS_EVER, demographics.YOB FROM PERIOD_SUMMARY_FINAL
-        AS a LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        demographics.FINAL_RE,
+        demographics.FINAL_SEX, 
+        demographics.EDUCATION,
+        demographics.EVER_INCARCERATED, 
+        demographics.FOREIGN_BORN,
+        demographics.HOMELESS_EVER, 
+        demographics.YOB
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
 QUIT;
 
 data PERIOD_SUMMARY_FINAL;
@@ -3720,82 +4237,114 @@ data PERIOD_SUMMARY_FINAL;
     if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
     else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
     else HOMELESS_HISTORY_GROUP='Unknown';
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.INSURANCE_CAT,
-        cov.OTHER_SUBSTANCE_USE, cov.rural_group, cov.HCV_SEROPOSITIVE_INDICATOR
-        FROM PERIOD_SUMMARY_FINAL AS a LEFT JOIN FINAL_COHORT AS cov ON a.ID=
-        cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        cov.INSURANCE_CAT,
+        cov.OTHER_SUBSTANCE_USE, 
+        cov.rural_group, 
+        cov.HCV_SEROPOSITIVE_INDICATOR
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select *, case when ID in (select ID
-        from IJI_COHORT) then 1 else 0 end as IJI_DIAG from
-        PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        *, 
+        CASE WHEN ID IN (SELECT ID FROM IJI_COHORT)
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY_FINAL.*,
-        hcv.EVER_IDU_HCV from PERIOD_SUMMARY_FINAL left join HCV_STATUS as hcv
-        on PERIOD_SUMMARY_FINAL.ID=hcv.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT PERIOD_SUMMARY_FINAL.*, hcv.EVER_IDU_HCV
+    FROM PERIOD_SUMMARY_FINAL
+    LEFT JOIN HCV_STATUS AS hcv ON PERIOD_SUMMARY_FINAL.ID=hcv.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     set PERIOD_SUMMARY_FINAL;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
+    if EVER_IDU_HCV=1 OR IJI_DIAG=1 then IDU_EVIDENCE=1;
     else IDU_EVIDENCE=0;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.agegrp FROM
-        PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT a.*, cov.agegrp
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table summed_data as select ID, sum(eligble_cessation) as
-        total_person_time_cessation from PERIOD_SUMMARY_FINAL group by ID;
-quit;
+PROC SQL;
+    CREATE TABLE summed_data AS
+    SELECT ID, SUM(eligble_cessation) AS total_person_time_cessation
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY ID;
+QUIT;
 
 title "Summary statistics for Overall Follow-up Time";
 
-proc means data=summed_data mean median std min max q1 q3;
+proc means data=summed_data mean median std MIN max q1 q3;
     var total_person_time_cessation;
-run;
+RUN;
 
 title 'Moud Cessation, Overall';
 
-proc sql;
-    select sum(moud_stops) as moud_stops, sum(eligble_cessation) as
-        eligble_cessation from PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    SELECT 
+        SUM(moud_stops) AS moud_stops, 
+        SUM(eligble_cessation) AS eligble_cessation
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
 title 'Moud Cessation by Pregnancy Group, Overall';
 
-proc sql;
-    select group, count(*) as total_n, sum(moud_stops) as moud_stops,
-        sum(eligble_cessation) as eligble_cessation, calculated moud_stops /
-        calculated eligble_cessation as moud_stops_rate format=8.4, (calculated
-        moud_stops - 1.96 * sqrt(calculated moud_stops)) / calculated
-        eligble_cessation as moud_stops_rate_lower format=8.4, (calculated
-        moud_stops + 1.96 * sqrt(calculated moud_stops)) / calculated
-        eligble_cessation as moud_stops_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by group;
-quit;
+PROC SQL;
+    SELECT
+        GROUP, 
+        COUNT(*) AS total_n, 
+        SUM(moud_stops) AS moud_stops,
+        SUM(eligble_cessation) AS eligble_cessation, 
+        CALCULATED moud_stops / CALCULATED eligble_cessation 
+            AS moud_stops_rate format=8.4, 
+        (CALCULATED moud_stops - 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_lower format=8.4, 
+        (CALCULATED moud_stops + 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY GROUP;
+QUIT;
 
 %macro calculate_rates(group_by_vars, mytitle);
     title &mytitle;
 
-    proc sql;
-        select group, &group_by_vars, count(*) as total_n, sum(moud_stops) as
-            moud_stops, sum(eligble_cessation) as eligble_cessation, calculated
-            moud_stops / calculated eligble_cessation as moud_stops_rate
-            format=8.4, (calculated moud_stops - 1.96 * sqrt(calculated
-            moud_stops)) / calculated eligble_cessation as moud_stops_rate_lower
-            format=8.4, (calculated moud_stops + 1.96 * sqrt(calculated
-            moud_stops)) / calculated eligble_cessation as moud_stops_rate_upper
-            format=8.4 from PERIOD_SUMMARY_FINAL group by group, &group_by_vars;
-    quit;
+    PROC SQL;
+    SELECT
+        GROUP, 
+        &group_by_vars, 
+        COUNT(*) AS total_n, 
+        SUM(moud_stops) AS moud_stops, 
+        SUM(eligble_cessation) AS eligble_cessation, 
+        CALCULATED moud_stops / CALCULATED eligble_cessation 
+            AS moud_stops_rate format=8.4, 
+        (CALCULATED moud_stops - 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_lower format=8.4, 
+        (CALCULATED moud_stops + 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY GROUP, &group_by_vars;
+    QUIT;
 %mend calculate_rates;
 
 %calculate_rates(agegrp,
@@ -3821,44 +4370,55 @@ quit;
 title;
 
 /*=================================================================*/
-/* 6. MOUD Duration Stats and Cessation Rates by MOUD Start Time  */
+/* 6. MOUD Duration Stats AND Cessation Rates by MOUD Start Time  */
 /*=================================================================*/
 
-/* This section does the same thing as section 11 but rather than pregnancy status as the group of analysis, it uses MOUD start time relative to pregnancy as the group of analysis (i.e. MOUD start before, during, or after pregnancy)
-So, it begins with summarized MOUD start group information, merging this with a prepared dataset that tracks individuals by ID, month, and year. The script then calculates person-time eligible for cessation and summarizes cessation events by MOUD start group.
-Demographic and clinical data, including homelessness history, incarceration, birth indicators, and HCV status, are integrated into the final dataset. Additional derived variables, such as age and an indicator for injection drug use (IDU) evidence, are created.
-Next, generate statistical summaries of MOUD cessation rates overall and stratified by key demographic and clinical characteristics using a macro for automated subgroup analysis. */
+/* This section does the same thing AS section 11 but rather than pregnancy status AS the group of analysis, it uses MOUD start time relative to pregnancy AS the group of analysis (i.e. MOUD start before, during, OR after pregnancy)
+So, it begins with summarized MOUD start group information, merging this with a prepared dataset that tracks individuals by ID, month, AND year. The script then calculates person-time eligible for cessation AND summarizes cessation events by MOUD start group.
+Demographic AND clinical data, including homelessness history, incarceration, birth indicators, AND HCV status, are integrated into the final dataset. Additional derived variables, such AS age AND an indicator for injection drug use (IDU) evidence, are created.
+Next, generate statistical summaries of MOUD cessation rates overall AND stratified by key demographic AND clinical characteristics using a macro for automated subgroup analysis. */
 data moud_spine_preg;
     set moud_spine_preg;
 
-    /* Categorize individuals based on pregnancy and post-partum status */
+    /* Categorize individuals based ON pregnancy AND post-partum status */
     if preg_flag=1 then group=6; /* Pregnant */
     else if preg_flag=2 then group=5; /* 0-6 months post-partum */
     else if preg_flag=3 then group=4; /* 7-12 months post-partum */
     else if preg_flag=4 then group=3; /* 13-18 months post-partum */
     else if preg_flag=5 then group=3; /* 19-24 months post-partum */
     else if preg_flag=6 then group=2; /* >24 months post-partum */
-    else if preg_flag=9999 and has_pregnancy=1 then group=1;
+    else if preg_flag=9999 AND has_pregnancy=1 then group=1;
     /* Pre-first pregnancy */
-    else if preg_flag=9999 and has_pregnancy=0 then group=0;
+    else if preg_flag=9999 AND has_pregnancy=0 then group=0;
     /* Never pregnant */
-run;
+RUN;
 
-proc sql;
-    create table collapsed as select ID, year, month, max(preg_flag) as
-        preg_flag, max(has_pregnancy) as has_pregnancy, max(group) as group,
-        max(moud_init) as moud_init,
-        /* if multiple moud_init = 1 in a month, take the first moud_start_group observed */
-        min(case when moud_init=1 then moud_start_group else . end) as
-        moud_start_group from moud_spine_preg group by ID, year, month order by
-        ID, year, month;
-quit;
+PROC SQL;
+    CREATE TABLE collapsed AS
+    SELECT 
+        ID, 
+        year, 
+        month, 
+        max(preg_flag) AS preg_flag, 
+        max(has_pregnancy) AS has_pregnancy, 
+        max(GROUP) AS GROUP,
+        max(moud_init) AS moud_init,
+        /* if multiple moud_init = 1 IN a month, take the first moud_start_group observed */
+        MIN(
+            CASE WHEN moud_init=1 THEN moud_start_group ELSE . END
+            ) AS moud_start_group
+    FROM moud_spine_preg
+    GROUP BY ID, year, month 
+    ORDER BY ID, year, month;
+QUIT;
 
-proc sql;
-    create table PREPARED_DATA as select a.*, b.moud_start_group, b.group as
-        group from PREPARED_DATA a left join collapsed b on a.ID=b.ID and a.year
-        =b.year and a.month=b.month;
-quit;
+PROC SQL;
+    CREATE TABLE PREPARED_DATA AS
+    SELECT a.*, b.moud_start_group, b.GROUP AS GROUP
+    FROM PREPARED_DATA a
+    LEFT JOIN collapsed b 
+        ON a.ID=b.ID AND a.year=b.year AND a.month=b.month;
+QUIT;
 
 data PREPARED_DATA;
     set PREPARED_DATA;
@@ -3872,9 +4432,9 @@ data PREPARED_DATA;
         pending_moud_start_group=.;
     end;
 
-    /* If both happen in same month, queue initiation */
-    /* Only queue if there is a previous episode to carry forward */
-    if moud_init=1 and moud_cessation=1 then do;
+    /* If both happen IN same month, queue initiation */
+    /* Only queue if there IS a previous episode to carry forward */
+    if moud_init=1 AND moud_cessation=1 then do;
         if not missing(moud_start_group_cf) then pending_moud_start_group=
             moud_start_group;
         else moud_start_group_cf=moud_start_group;
@@ -3899,52 +4459,76 @@ data PREPARED_DATA;
     end;
 
     drop moud_start_group_cf pending_moud_start_group;
-run;
+RUN;
 
-proc sql;
-    create table PERSON_TIME as select ID, moud_start_group, group, sum(case
-        when moud_flag=1 then 1 else 0 end) as eligble_cessation from
-        PREPARED_DATA group by ID, group, moud_start_group;
-quit;
+PROC SQL;
+    CREATE TABLE PERSON_TIME AS
+    SELECT 
+        ID, 
+        moud_start_group,
+        GROUP, 
+        SUM(CASE WHEN moud_flag=1 THEN 1 ELSE 0 END) AS eligble_cessation
+    FROM PREPARED_DATA
+    GROUP BY ID, GROUP, moud_start_group;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY as select ID, moud_start_group, group,
-        sum(moud_cessation) as moud_stops from PREPARED_DATA group by ID, group,
-        moud_start_group;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY AS
+    SELECT 
+        ID, 
+        moud_start_group,
+        GROUP,
+        SUM(moud_cessation) AS moud_stops
+    FROM PREPARED_DATA
+    GROUP BY ID, GROUP, moud_start_group;
+QUIT;
 
 proc sort data=PERSON_TIME;
     by ID moud_start_group group;
-run;
+RUN;
 
 proc sort data=PERIOD_SUMMARY;
     by ID moud_start_group group;
-run;
+RUN;
 
 data PERIOD_SUMMARY_FINAL;
     merge PERIOD_SUMMARY PERSON_TIME;
     by ID moud_start_group group;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, demographics.FINAL_RE,
-        demographics.FINAL_SEX, demographics.EDUCATION,
-        demographics.EVER_INCARCERATED, demographics.FOREIGN_BORN,
-        demographics.HOMELESS_EVER, demographics.YOB FROM PERIOD_SUMMARY_FINAL
-        AS a LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        demographics.FINAL_RE,
+        demographics.FINAL_SEX, 
+        demographics.EDUCATION,
+        demographics.EVER_INCARCERATED, 
+        demographics.FOREIGN_BORN,
+        demographics.HOMELESS_EVER, 
+        demographics.YOB
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
 QUIT;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.INSURANCE_CAT,
-        cov.OTHER_SUBSTANCE_USE, cov.rural_group, cov.HCV_SEROPOSITIVE_INDICATOR
-        FROM PERIOD_SUMMARY_FINAL AS a LEFT JOIN FINAL_COHORT AS cov ON a.ID=
-        cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        cov.INSURANCE_CAT,
+        cov.OTHER_SUBSTANCE_USE, 
+        cov.rural_group, 
+        cov.HCV_SEROPOSITIVE_INDICATOR
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select a.*, b.BIRTH_INDICATOR from
-        PERIOD_SUMMARY_FINAL a left join births b on a.ID=b.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT a.*, b.BIRTH_INDICATOR
+    FROM PERIOD_SUMMARY_FINAL a
+    LEFT JOIN births b ON a.ID=b.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     length HOMELESS_HISTORY_GROUP $10;
@@ -3952,58 +4536,81 @@ data PERIOD_SUMMARY_FINAL;
     if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
     else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
     else HOMELESS_HISTORY_GROUP='Unknown';
-run;
+RUN;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select *, case when ID in (select ID
-        from IJI_COHORT) then 1 else 0 end as IJI_DIAG from
-        PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        *, 
+        CASE WHEN ID IN (SELECT ID FROM IJI_COHORT)
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY_FINAL.*,
-        hcv.EVER_IDU_HCV from PERIOD_SUMMARY_FINAL left join HCV_STATUS as hcv
-        on PERIOD_SUMMARY_FINAL.ID=hcv.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT PERIOD_SUMMARY_FINAL.*, hcv.EVER_IDU_HCV
+    FROM PERIOD_SUMMARY_FINAL
+    LEFT JOIN HCV_STATUS AS hcv ON PERIOD_SUMMARY_FINAL.ID=hcv.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     set PERIOD_SUMMARY_FINAL;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
+    if EVER_IDU_HCV=1 OR IJI_DIAG=1 then IDU_EVIDENCE=1;
     else IDU_EVIDENCE=0;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.agegrp FROM
-        PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT a.*, cov.agegrp
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
 QUIT;
 
 title 'Moud Cessation by moud_start_group Group, Overall';
 
-proc sql;
-    select group, moud_start_group, count(*) as total_n, sum(moud_stops) as
-        moud_stops, sum(eligble_cessation) as eligble_cessation, calculated
-        moud_stops / calculated eligble_cessation as moud_stops_rate format=8.4,
-        (calculated moud_stops - 1.96 * sqrt(calculated moud_stops)) /
-        calculated eligble_cessation as moud_stops_rate_lower format=8.4,
-        (calculated moud_stops + 1.96 * sqrt(calculated moud_stops)) /
-        calculated eligble_cessation as moud_stops_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by moud_start_group, group;
-quit;
+PROC SQL;
+    SELECT
+        GROUP, 
+        moud_start_group, 
+        COUNT(*) AS total_n, 
+        SUM(moud_stops) AS moud_stops, 
+        SUM(eligble_cessation) AS eligble_cessation, 
+        CALCULATED moud_stops / CALCULATED eligble_cessation 
+            AS moud_stops_rate format=8.4,
+        (CALCULATED moud_stops - 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_lower format=8.4,
+        (CALCULATED moud_stops + 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY moud_start_group, GROUP;
+QUIT;
 
 %macro calculate_rates(group_by_vars, mytitle);
     title &mytitle;
 
-    proc sql;
-        select moud_start_group, &group_by_vars, count(*) as total_n,
-            sum(moud_stops) as moud_stops, sum(eligble_cessation) as
-            eligble_cessation, calculated moud_stops / calculated
-            eligble_cessation as moud_stops_rate format=8.4, (calculated
-            moud_stops - 1.96 * sqrt(calculated moud_stops)) / calculated
-            eligble_cessation as moud_stops_rate_lower format=8.4, (calculated
-            moud_stops + 1.96 * sqrt(calculated moud_stops)) / calculated
-            eligble_cessation as moud_stops_rate_upper format=8.4 from
-            PERIOD_SUMMARY_FINAL group by moud_start_group, &group_by_vars;
-    quit;
+    PROC SQL;
+    SELECT 
+        moud_start_group, 
+        &group_by_vars, 
+        COUNT(*) AS total_n,
+        SUM(moud_stops) AS moud_stops, 
+        SUM(eligble_cessation) AS eligble_cessation, 
+        CALCULATED moud_stops / CALCULATED eligble_cessation 
+            AS moud_stops_rate format=8.4, 
+        (CALCULATED moud_stops - 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_lower format=8.4, 
+        (CALCULATED moud_stops + 1.96 * sqrt(CALCULATED moud_stops)) /
+            CALCULATED eligble_cessation 
+            AS moud_stops_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY moud_start_group, &group_by_vars;
+    QUIT;
 %mend calculate_rates;
 
 %calculate_rates(agegrp,
@@ -4029,46 +4636,54 @@ quit;
 title;
 
 /*============================================*/
-/* 7. MOUD Primary and Secondary Initation   */
+/* 7. MOUD Primary AND Secondary Initation   */
 /*============================================*/
-/* This section again repeats the previous sections on a different dataset. MOUD_FULL contains all IDs from the cohort (both those who did and did not have MOUD episodes) compared to MOUD_DURATION that only contained IDs that had an episode of MOUD.
-This section begins by merging OUD-related information into a prepared dataset and calculates the earliest OUD case report period for each individual. It then determines the number of events (e.g., MOUD initiation) occurring before the case report.
-The dataset is further refined by filtering records based on time criteria and calculating eligibility and censoring variables related to MOUD initiation and reinitiation.
-The code then aggregates person-time data for MOUD initiation and reinitiation, merges demographic data, and categorizes homelessness history.
-It also identifies individuals with IDU history based on available datasets. Age groups are assigned, and overall follow-up time statistics are calculated.
-Finally, it generates summary statistics and stratified analyses of MOUD initiation and reinitiation rates by key demographic variables (e.g., age, race, education, homelessness, incarceration, foreign-born status, and IDU history).
+/* This section again repeats the previous sections ON a different dataset. MOUD_FULL contains all IDs from the cohort (both those who did AND did not have MOUD episodes) compared to MOUD_DURATION that only contained IDs that had an episode of MOUD.
+This section begins by merging OUD-related information into a prepared dataset AND calculates the earliest OUD case report period for each individual. It then determines the number of events (e.g., MOUD initiation) occurring before the case report.
+The dataset IS further refined by filtering records based ON time criteria AND calculating eligibility AND censoring variables related to MOUD initiation AND reinitiation.
+The code then aggregates person-time data for MOUD initiation AND reinitiation, merges demographic data, AND categorizes homelessness history.
+It also identifies individuals with IDU history based ON available datasets. Age groups are assigned, AND overall follow-up time statistics are calculated.
+Finally, it generates summary statistics AND stratified analyses of MOUD initiation AND reinitiation rates by key demographic variables (e.g., age, race, education, homelessness, incarceration, foreign-born status, AND IDU history).
 The analysis uses a macro to generate stratified tables efficiently. */
 %moud_table_creation(moud_full);
 
-proc sql;
-    create table PREPARED_DATA as select PREPARED_DATA.*, cov.oud_year,
-        cov.oud_month from PREPARED_DATA left join oud_preg as cov on
-        PREPARED_DATA.ID=cov.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PREPARED_DATA AS
+    SELECT PREPARED_DATA.*, cov.oud_year, cov.oud_month
+    FROM PREPARED_DATA
+    LEFT JOIN oud_preg AS cov ON PREPARED_DATA.ID=cov.ID;
+QUIT;
 
-proc sql;
-    create table case_report_events as select ID, min(OUD_YEAR*12 + OUD_MONTH)
-        as case_report_period from PREPARED_DATA group by ID;
-quit;
+PROC SQL;
+    CREATE TABLE case_report_events AS
+    SELECT ID, MIN(OUD_YEAR*12 + OUD_MONTH) AS case_report_period
+    FROM PREPARED_DATA
+    GROUP BY ID;
+QUIT;
 
-proc sql;
-    create table pre_case_report_counts as select sum(moud_init) as
-        moud_init_before_case from PREPARED_DATA as a inner join
-        case_report_events as c on a.ID=c.ID where (a.year*12 + a.month) <
-        c.case_report_period;
-quit;
+PROC SQL;
+    CREATE TABLE pre_case_report_counts AS
+    SELECT SUM(moud_init) AS moud_init_before_case
+    FROM PREPARED_DATA AS a
+    INNER JOIN case_report_events AS c ON a.ID=c.ID
+    WHERE (a.year*12 + a.month) < c.case_report_period;
+QUIT;
 
 title "Counts of Events Occurring Before Case Report";
 
 proc print data=pre_case_report_counts noobs;
-run;
+RUN;
 title;
 
-proc sql;
-    create table PREPARED_DATA as select * from PREPARED_DATA where (YEAR >
-        oud_year) or (YEAR=oud_year and MONTH >= oud_month) order by ID, YEAR,
-        MONTH;
-quit;
+PROC SQL;
+    CREATE TABLE PREPARED_DATA AS
+    SELECT *
+    FROM PREPARED_DATA
+    WHERE 
+        (YEAR > oud_year) OR 
+        (YEAR = oud_year AND MONTH >= oud_month) 
+    ORDER BY ID, YEAR, MONTH;
+QUIT;
 
 data PREPARED_DATA;
     set PREPARED_DATA;
@@ -4091,54 +4706,72 @@ data PREPARED_DATA;
     moud_primaryinit=0;
     moud_reinit=0;
 
-    /* --- Update re-init eligibility based on cessation FIRST --- */
+    /* --- Update re-init eligibility based ON cessation FIRST --- */
     if moud_cessation=1 then eligible_reinit=1;
 
     /* --- PRIMARY INITIATION --- */
-    if moud_init=1 and eligible_primaryinit=1 then do;
+    if moud_init=1 AND eligible_primaryinit=1 then do;
         moud_primaryinit=1;
     end;
 
     /* --- RE-INITIATION EVENTS --- */
-    else if moud_init=1 and eligible_primaryinit=0 and eligible_reinit=1 then
+    else if moud_init=1 AND eligible_primaryinit=0 AND eligible_reinit=1 then
         do;
         moud_reinit=1;
     end;
 
-run;
+RUN;
 
-proc sql;
-    create table PERSON_TIME as select ID, group,
-        sum(eligible_primaryinit+eligible_reinit) as total_eligible_init,
-        sum(eligible_primaryinit) as eligible_init, sum(eligible_reinit) as
-        eligible_reinit from PREPARED_DATA group by ID, group;
-quit;
+PROC SQL;
+    CREATE TABLE PERSON_TIME AS
+    SELECT 
+        ID,
+        GROUP,
+        SUM(eligible_primaryinit+eligible_reinit) AS total_eligible_init,
+        SUM(eligible_primaryinit) AS eligible_init, 
+        SUM(eligible_reinit) AS eligible_reinit
+    FROM PREPARED_DATA
+    GROUP BY ID, GROUP;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY as select ID, group, sum(moud_init) as
-        moud_init, sum(moud_primaryinit) as moud_primaryinit, sum(moud_reinit)
-        as moud_reinit from PREPARED_DATA group by ID, group;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY AS
+    SELECT 
+        ID,
+        GROUP, 
+        SUM(moud_init) AS moud_init, 
+        SUM(moud_primaryinit) AS moud_primaryinit, 
+        SUM(moud_reinit) AS moud_reinit
+    FROM PREPARED_DATA
+    GROUP BY ID, GROUP;
+QUIT;
 
 proc sort data=PERSON_TIME;
     by ID group;
-run;
+RUN;
 
 proc sort data=PERIOD_SUMMARY;
     by ID group;
-run;
+RUN;
 
 data PERIOD_SUMMARY_FINAL;
     merge PERIOD_SUMMARY PERSON_TIME;
     by ID group;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, demographics.FINAL_RE,
-        demographics.FINAL_SEX, demographics.EDUCATION,
-        demographics.EVER_INCARCERATED, demographics.FOREIGN_BORN,
-        demographics.HOMELESS_EVER, demographics.YOB FROM PERIOD_SUMMARY_FINAL
-        AS a LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        demographics.FINAL_RE,
+        demographics.FINAL_SEX, 
+        demographics.EDUCATION,
+        demographics.EVER_INCARCERATED, 
+        demographics.FOREIGN_BORN,
+        demographics.HOMELESS_EVER, 
+        demographics.YOB
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN PHDSPINE.DEMO AS demographics ON a.ID=demographics.ID;
 QUIT;
 
 data PERIOD_SUMMARY_FINAL;
@@ -4147,154 +4780,201 @@ data PERIOD_SUMMARY_FINAL;
     if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
     else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
     else HOMELESS_HISTORY_GROUP='Unknown';
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.INSURANCE_CAT,
-        cov.OTHER_SUBSTANCE_USE, cov.rural_group, cov.HCV_SEROPOSITIVE_INDICATOR
-        FROM PERIOD_SUMMARY_FINAL AS a LEFT JOIN FINAL_COHORT AS cov ON a.ID=
-        cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        cov.INSURANCE_CAT,
+        cov.OTHER_SUBSTANCE_USE, 
+        cov.rural_group, 
+        cov.HCV_SEROPOSITIVE_INDICATOR
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select *, case when ID in (select ID
-        from IJI_COHORT) then 1 else 0 end as IJI_DIAG from
-        PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        *, 
+        CASE WHEN ID IN (SELECT ID FROM IJI_COHORT)
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY_FINAL.*,
-        hcv.EVER_IDU_HCV from PERIOD_SUMMARY_FINAL left join HCV_STATUS as hcv
-        on PERIOD_SUMMARY_FINAL.ID=hcv.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT PERIOD_SUMMARY_FINAL.*, hcv.EVER_IDU_HCV
+    FROM PERIOD_SUMMARY_FINAL
+    LEFT JOIN HCV_STATUS AS hcv ON PERIOD_SUMMARY_FINAL.ID=hcv.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     set PERIOD_SUMMARY_FINAL;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
+    if EVER_IDU_HCV=1 OR IJI_DIAG=1 then IDU_EVIDENCE=1;
     else IDU_EVIDENCE=0;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.agegrp FROM
-        PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT a.*, cov.agegrp
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table summed_data as select ID, sum(total_eligible_init) as
-        total_eligible_init, sum(eligible_init) as total_person_time_init,
-        sum(eligible_reinit) as total_person_time_reinit from
-        PERIOD_SUMMARY_FINAL group by ID;
-quit;
+PROC SQL;
+    CREATE TABLE summed_data AS
+    SELECT 
+        ID, 
+        SUM(total_eligible_init) AS total_eligible_init, 
+        SUM(eligible_init) AS total_person_time_init,
+        SUM(eligible_reinit) AS total_person_time_reinit
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY ID;
+QUIT;
 
 title "Summary statistics for Overall Follow-up Time";
 
-proc means data=summed_data mean median std min max q1 q3;
+proc means data=summed_data mean median std MIN max q1 q3;
     var total_eligible_init total_person_time_init total_person_time_reinit;
-run;
+RUN;
 
-title 'Moud Initiation and Reinitiation, Overall';
+title 'Moud Initiation AND Reinitiation, Overall';
 
-proc sql;
-    select sum(moud_init) as moud_init, sum(total_eligible_init) as
-        total_eligible_init, sum(moud_primaryinit) as moud_primaryinit,
-        sum(eligible_init) as eligible_init, sum(moud_reinit) as moud_reinit,
-        sum(eligible_reinit) as eligible_reinit from PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    SELECT 
+        SUM(moud_init) AS moud_init, 
+        SUM(total_eligible_init) AS total_eligible_init, 
+        SUM(moud_primaryinit) AS moud_primaryinit,
+        SUM(eligible_init) AS eligible_init, 
+        SUM(moud_reinit) AS moud_reinit,
+        SUM(eligible_reinit) AS eligible_reinit
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 title;
 
 title 'Moud Initiation by Pregnancy Group, Overall';
 
-proc sql;
-    select group, count(*) as total_n, sum(moud_init) as moud_init,
-        sum(total_eligible_init) as total_eligible_init, calculated moud_init /
-        calculated total_eligible_init as moud_init_rate format=8.4, (calculated
-        moud_init - 1.96 * sqrt(calculated moud_init)) / calculated
-        total_eligible_init as moud_init_rate_lower format=8.4, (calculated
-        moud_init + 1.96 * sqrt(calculated moud_init)) / calculated
-        total_eligible_init as moud_init_rate_upper format=8.4,
-        sum(moud_primaryinit) as moud_primaryinit, sum(eligible_init) as
-        eligible_init, calculated moud_primaryinit / calculated eligible_init as
-        moud_primaryinit_rate format=8.4, (calculated moud_primaryinit - 1.96 *
-        sqrt(calculated moud_primaryinit)) / calculated eligible_init as
-        moud_primaryinit_rate_lower format=8.4, (calculated moud_primaryinit +
-        1.96 * sqrt(calculated moud_primaryinit)) / calculated eligible_init as
-        moud_primaryinit_rate_upper format=8.4, sum(moud_reinit) as moud_reinit,
-        sum(eligible_reinit) as eligible_reinit, calculated moud_reinit /
-        calculated eligible_reinit as moud_reinit_rate format=8.4, (calculated
-        moud_reinit - 1.96 * sqrt(calculated moud_reinit)) / calculated
-        eligible_reinit as moud_reinit_rate_lower format=8.4, (calculated
-        moud_reinit + 1.96 * sqrt(calculated moud_reinit)) / calculated
-        eligible_reinit as moud_reinit_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by group;
-quit;
+PROC SQL;
+    SELECT
+        GROUP, 
+        COUNT(*) AS total_n, 
+        SUM(moud_init) AS moud_init,
+        SUM(total_eligible_init) AS total_eligible_init, 
+        CALCULATED moud_init / CALCULATED total_eligible_init 
+            AS moud_init_rate format=8.4, 
+        (CALCULATED moud_init - 1.96 * sqrt(CALCULATED moud_init)) / 
+            CALCULATED total_eligible_init 
+            AS moud_init_rate_lower format=8.4, 
+        (CALCULATED moud_init + 1.96 * sqrt(CALCULATED moud_init)) / 
+            CALCULATED total_eligible_init 
+            AS moud_init_rate_upper format=8.4,
+        SUM(moud_primaryinit) AS moud_primaryinit, 
+        SUM(eligible_init) AS eligible_init, 
+        CALCULATED moud_primaryinit / CALCULATED eligible_init 
+            AS moud_primaryinit_rate format=8.4, 
+        (CALCULATED moud_primaryinit - 1.96 * 
+            sqrt(CALCULATED moud_primaryinit)) / CALCULATED eligible_init 
+            AS moud_primaryinit_rate_lower format=8.4, 
+        (CALCULATED moud_primaryinit + 1.96 * 
+            sqrt(CALCULATED moud_primaryinit)) / CALCULATED eligible_init 
+            AS moud_primaryinit_rate_upper format=8.4,
+        SUM(moud_reinit) AS moud_reinit,
+        SUM(eligible_reinit) AS eligible_reinit, 
+        CALCULATED moud_reinit / CALCULATED eligible_reinit 
+            AS moud_reinit_rate format=8.4, 
+        (CALCULATED moud_reinit - 1.96 * sqrt(CALCULATED moud_reinit)) /
+            CALCULATED eligible_reinit 
+            AS moud_reinit_rate_lower format=8.4, 
+        (CALCULATED moud_reinit + 1.96 * sqrt(CALCULATED moud_reinit)) /
+            CALCULATED eligible_reinit 
+            AS moud_reinit_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY
+    GROUP;
+QUIT;
 
 %macro calculate_rates(group_by_vars, mytitle);
     title &mytitle;
 
-    proc sql;
-        select group, &group_by_vars, count(*) as total_n, sum(moud_init) as
-            moud_init, sum(total_eligible_init) as total_eligible_init,
-            calculated moud_init / calculated total_eligible_init as
-            moud_init_rate format=8.4, (calculated moud_init - 1.96 *
-            sqrt(calculated moud_init)) / calculated total_eligible_init as
-            moud_init_rate_lower format=8.4, (calculated moud_init + 1.96 *
-            sqrt(calculated moud_init)) / calculated total_eligible_init as
-            moud_init_rate_upper format=8.4, sum(moud_primaryinit) as
-            moud_primaryinit, sum(eligible_init) as eligible_init, calculated
-            moud_primaryinit / calculated eligible_init as moud_primaryinit_rate
-            format=8.4, (calculated moud_primaryinit - 1.96 * sqrt(calculated
-            moud_primaryinit)) / calculated eligible_init as
-            moud_primaryinit_rate_lower format=8.4, (calculated moud_primaryinit
-            + 1.96 * sqrt(calculated moud_primaryinit)) / calculated
-            eligible_init as moud_primaryinit_rate_upper format=8.4,
-            sum(moud_reinit) as moud_reinit, sum(eligible_reinit) as
-            eligible_reinit, calculated moud_reinit / calculated eligible_reinit
-            as moud_reinit_rate format=8.4, (calculated moud_reinit - 1.96 *
-            sqrt(calculated moud_reinit)) / calculated eligible_reinit as
-            moud_reinit_rate_lower format=8.4, (calculated moud_reinit + 1.96 *
-            sqrt(calculated moud_reinit)) / calculated eligible_reinit as
-            moud_reinit_rate_upper format=8.4 from PERIOD_SUMMARY_FINAL group by
-            group, &group_by_vars;
-    quit;
+    PROC SQL;
+    SELECT
+        GROUP, 
+        &group_by_vars, 
+        COUNT(*) AS total_n, 
+        SUM(moud_init) AS moud_init, 
+        SUM(total_eligible_init) AS total_eligible_init,
+        CALCULATED moud_init / CALCULATED total_eligible_init 
+            AS moud_init_rate format=8.4, 
+        (CALCULATED moud_init - 1.96 * sqrt(CALCULATED moud_init)) / 
+            CALCULATED total_eligible_init AS moud_init_rate_lower format=8.4,
+        (CALCULATED moud_init + 1.96 * sqrt(CALCULATED moud_init)) / 
+            CALCULATED total_eligible_init AS moud_init_rate_upper format=8.4,
+        SUM(moud_primaryinit) AS moud_primaryinit, 
+        SUM(eligible_init) AS eligible_init, 
+        CALCULATED moud_primaryinit / CALCULATED eligible_init 
+            AS moud_primaryinit_rate format=8.4, 
+        (CALCULATED moud_primaryinit - 1.96 * 
+            sqrt(CALCULATED moud_primaryinit)) / CALCULATED eligible_init 
+            AS moud_primaryinit_rate_lower format=8.4,
+        (CALCULATED moud_primaryinit + 1.96 * 
+            sqrt(CALCULATED moud_primaryinit)) / CALCULATED eligible_init 
+            AS moud_primaryinit_rate_upper format=8.4,
+        SUM(moud_reinit) AS moud_reinit, 
+        SUM(eligible_reinit) AS eligible_reinit, 
+        CALCULATED moud_reinit / CALCULATED eligible_reinit
+            AS moud_reinit_rate format=8.4, 
+        (CALCULATED moud_reinit - 1.96 * 
+            sqrt(CALCULATED moud_reinit)) / CALCULATED eligible_reinit 
+            AS moud_reinit_rate_lower format=8.4, 
+        (CALCULATED moud_reinit + 1.96 *
+            sqrt(CALCULATED moud_reinit)) / CALCULATED eligible_reinit 
+            AS moud_reinit_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY GROUP, &group_by_vars;
+    QUIT;
 %mend calculate_rates;
 
 %calculate_rates(agegrp,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by Age');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by Age');
 %calculate_rates(FINAL_RE,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by FINAL_RE');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by FINAL_RE');
 %calculate_rates(EDUCATION,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by EDUCATION');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by EDUCATION');
 %calculate_rates(HOMELESS_HISTORY_GROUP,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by HOMELESS_HISTORY_GROUP');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by HOMELESS_HISTORY_GROUP');
 %calculate_rates(EVER_INCARCERATED,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by EVER_INCARCERATED');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by EVER_INCARCERATED');
 %calculate_rates(IDU_EVIDENCE,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by IDU_EVIDENCE');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by IDU_EVIDENCE');
 %calculate_rates(INSURANCE_CAT,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by INSURANCE_CAT');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by INSURANCE_CAT');
 %calculate_rates(HCV_SEROPOSITIVE_INDICATOR,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by HCV_SEROPOSITIVE_INDICATOR');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by HCV_SEROPOSITIVE_INDICATOR');
 %calculate_rates(OTHER_SUBSTANCE_USE,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by OTHER_SUBSTANCE_USE');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by OTHER_SUBSTANCE_USE');
 %calculate_rates(rural_group,
-    'Moud Initiation and Reinitiation by Pregnancy Group, Stratified by rural_group');
+    'Moud Initiation AND Reinitiation by Pregnancy Group, Stratified by rural_group');
 title;
 
 /*===================================*/
 /* Part 5: Calculate Overdose Rates  */
 /*===================================*/
-/* This portion of the code processes the `PHDSPINE.OVERDOSE` dataset by first sorting and
-creating a unique `episode_id` for each overdose episode. Missing IDs from the moud dataset are identified and added
+/* This portion of the code processes the `PHDSPINE.OVERDOSE` dataset by first sorting AND
+creating a unique `episode_id` for each overdose episode. Missing IDs from the moud dataset are identified AND added
 with placeholder episode_id values to the overdose data (to recpatilate the structure of the moud_init dataset).
-Demographic information is merged with the overdose dataset and filtered filtered to include only female subjects.
-The overdose data is sorted and merged with month and year flags to create the final cartesian overdose table,
-combining relevant flags such as pregnancy_flags, moud_flag, and posttxt_flag. */
+Demographic information IS merged with the overdose dataset AND filtered filtered to include only female subjects.
+The overdose data IS sorted AND merged with month AND year flags to create the final cartesian overdose table,
+combining relevant flags such AS pregnancy_flags, moud_flag, AND posttxt_flag. */
 /*==========================*/
 /* 1. Prepare Overdose Data */
 /*==========================*/
 
 /* This section prepares the overdose data by selecting relevant variables from the source dataset
-and ensures that only the necessary columns are retained. The dataset is then sorted by ID and overdose date (OD_DATE) to organize the data for further analysis. */
+AND ensures that only the necessary columns are retained. The dataset IS then sorted by ID AND overdose date (OD_DATE) to organize the data for further analysis. */
 DATA overdose;
     SET PHDSPINE.OVERDOSE;
     KEEP ID OD_MONTH OD_YEAR OD_DATE FATAL_OD_DEATH OD_COUNT;
@@ -4308,8 +4988,8 @@ RUN;
 /* 2. Create Episode Numbers */
 /*===========================*/
 
-/* This step assigns an episode number to each overdose event for each individual. The episode number is initialized to 1 for the first record and incremented for subsequent records within the same ID.
-A new variable, 'episode_id', is created by concatenating the individual ID and the episode number to uniquely identify each episode. */
+/* This step assigns an episode number to each overdose event for each individual. The episode number IS initialized to 1 for the first record AND incremented for subsequent records within the same ID.
+A new variable, 'episode_id', IS created by concatenating the individual ID AND the episode number to uniquely identify each episode. */
 DATA overdose;
     SET overdose;
     by ID OD_DATE;
@@ -4327,89 +5007,97 @@ PROC SORT data=overdose;
 RUN;
 
 /*==========================*/
-/* 3. Filter by Year and ID */
+/* 3. Filter by Year AND ID */
 /*==========================*/
 
-/* Filter the overdose data to keep only records from our cohort and from the year 2014 and onwards */
+/* Filter the overdose data to keep only records from our cohort AND from the year 2014 AND onwards */
 data overdose;
     set overdose;
     where OD_YEAR >= 2014;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE overdose AS SELECT * FROM overdose WHERE ID IN (SELECT DISTINCT
-        ID FROM oud_distinct);
+    CREATE TABLE overdose AS
+    SELECT *
+    FROM overdose
+    WHERE ID IN (SELECT DISTINCT ID FROM oud_distinct);
 QUIT;
 
 /*======================================*/
-/* 4. Identify Missing IDs in MOUD Data */
+/* 4. Identify Missing IDs IN MOUD Data */
 /*======================================*/
 
-/* This SQL procedure identifies individuals (IDs) who appear in the pregnancy data (oud_preg) but do not have corresponding entries in the MOUD data */
-proc sql;
-    create table missing_ids as select a.ID from oud_preg as a where not exists
-        (select 1 from overdose as b where a.ID=b.ID);
-quit;
+/* This SQL procedure identifies individuals (IDs) who appear IN the pregnancy data (oud_preg) but do not have corresponding entries IN the MOUD data */
+PROC SQL;
+    CREATE TABLE missing_ids AS
+    SELECT a.ID
+    FROM oud_preg AS a
+    WHERE NOT EXISTS(SELECT 1 FROM overdose AS b WHERE a.ID=b.ID);
+QUIT;
 
 /*=========================================*/
 /* 5. Merge Missing IDs into Overdose Data */
 /*=========================================*/
 
-/* The next step merges the missing IDs into the overdose data, where a placeholder value (".") is assigned to the episode_id for these missing records.
-This ensures that all IDs are accounted for in the dataset, even if no MOUD data is available. */
+/* The next step merges the missing IDs into the overdose data, where a placeholder value (".") IS assigned to the episode_id for these missing records.
+This ensures that all IDs are accounted for IN the dataset, even if no MOUD data IS available. */
 DATA overdose_full;
     SET overdose;
 RUN;
 
-proc sql;
-    insert into overdose_full (ID, episode_id) select ID, "." from missing_ids;
-quit;
+PROC SQL;
+    insert into overdose_full (ID, episode_id)
+    SELECT ID, "."
+    FROM missing_ids;
+QUIT;
 
 /*===========================*/
 /* 8. Sort Data for Analysis */
 /*===========================*/
 
-/* Sorting the overdose dataset by ID, OD_YEAR, and OD_MONTH to facilitate time-series analysis and ensure chronological order of overdose events. */
+/* Sorting the overdose dataset by ID, OD_YEAR, AND OD_MONTH to facilitate time-series analysis AND ensure chronological order of overdose events. */
 PROC SORT DATA=overdose_full;
     by ID OD_YEAR OD_MONTH;
-run;
+RUN;
 
 /*====================*/
 /* 9. Create OD Table */
 /*====================*/
 
-/* This SQL procedure creates an initial table, combining the overdose data with month and year information. The table is used to track overdose flags for each month/year combination. */
+/* This SQL procedure creates an initial table, combining the overdose data with month AND year information. The table IS used to track overdose flags for each month/year combination. */
 PROC SQL;
-    CREATE TABLE od_table AS SELECT * FROM overdose_full, months, years;
+    CREATE TABLE od_table AS
+    SELECT *
+    FROM overdose_full, months, years;
 QUIT;
 
 /*==============================================*/
 /* 10. Flag Overdoses by Month-Year Combination */
 /*==============================================*/
 
-/* This step creates an "od_flag" variable indicating whether a particular overdose event matches a given month and year. The flag is set to 1 if there's a match, otherwise 0. */
+/* This step creates an "od_flag" variable indicating whether a particular overdose event matches a given month AND year. The flag IS set to 1 if there's a match, otherwise 0. */
 data od_table;
     set od_table;
-    if OD_MONTH=month and OD_YEAR=year then od_flag=1;
+    if OD_MONTH=month AND OD_YEAR=year then od_flag=1;
     else od_flag=0;
-run;
+RUN;
 
 /*==========================*/
 /* 11. Flag Fatal Overdoses */
 /*==========================*/
 
-/* This step creates a "fod_flag" variable to flag fatal overdoses. The flag is set to 1 for fatal overdoses (FATAL_OD_DEATH = 1) and 0 otherwise.
-Observations are censored after their fatal overdose and then explore whether overdoses were flagged after death date.
-Lastly, forward censor on earliest date of evidence of OUD to begin eligble period. */
+/* This step creates a "fod_flag" variable to flag fatal overdoses. The flag IS set to 1 for fatal overdoses (FATAL_OD_DEATH = 1) AND 0 otherwise.
+Observations are censored after their fatal overdose AND then explore whether overdoses were flagged after death date.
+Lastly, forward censor ON earliest date of evidence of OUD to begin eligble period. */
 data od_table;
     set od_table;
-    if OD_MONTH=month and OD_YEAR=year and FATAL_OD_DEATH=1 then fod_flag=1;
+    if OD_MONTH=month AND OD_YEAR=year AND FATAL_OD_DEATH=1 then fod_flag=1;
     else fod_flag=0;
-run;
+RUN;
 
 proc sort data=od_table;
     by ID year month;
-run;
+RUN;
 
 data od_table;
     set od_table;
@@ -4428,182 +5116,233 @@ data od_table;
         fod_month=month;
     end;
 
-    if censor_fod=1 and od_flag=1 and month > fod_month then od_after_fod_count
+    if censor_fod=1 AND od_flag=1 AND month > fod_month then od_after_fod_count
         + 1;
 
-run;
+RUN;
 
-proc sql;
-    create table max_counts as select id, max(od_after_fod_count) as
-        od_after_fod_max from od_table group by id;
-quit;
+PROC SQL;
+    CREATE TABLE max_counts AS
+    SELECT id, max(od_after_fod_count) AS od_after_fod_max
+    FROM od_table
+    GROUP BY id;
+QUIT;
 
 proc summary data=max_counts;
     var od_after_fod_max;
-    output out=sum_counts (drop=_type_ _freq_) sum=od_after_fod_max;
-run;
+    output out=sum_counts (drop=_type_ _freq_) SUM=od_after_fod_max;
+RUN;
 
 proc print data=sum_counts;
-run;
+RUN;
 
 data od_table;
     set od_table;
     by ID;
 
-    if censor_fod=1 and fod_flag=0 then delete;
+    if censor_fod=1 AND fod_flag=0 then delete;
 
-run;
+RUN;
 
-proc sql;
-    create table od_table as select od_table.*, cov.oud_year, cov.oud_month from
-        od_table left join oud_preg as cov on od_table.ID=cov.ID;
-quit;
+PROC SQL;
+    CREATE TABLE od_table AS
+    SELECT od_table.*, cov.oud_year, cov.oud_month
+    FROM od_table
+    LEFT JOIN oud_preg AS cov ON od_table.ID=cov.ID;
+QUIT;
 
-proc sql;
-    create table case_report_events as select ID, min(OUD_YEAR*12 + OUD_MONTH)
-        as case_report_period from od_table group by ID;
-quit;
+PROC SQL;
+    CREATE TABLE case_report_events AS
+    SELECT ID, MIN(OUD_YEAR*12 + OUD_MONTH) AS case_report_period
+    FROM od_table
+    GROUP BY ID;
+QUIT;
 
-proc sql;
-    create table pre_case_report_counts as select sum(od_flag) as
-        od_flag_before_case, sum(fod_flag) as fod_flag_before_case from od_table
-        as a inner join case_report_events as c on a.ID=c.ID where (a.year*12 +
-        a.month) < c.case_report_period;
-quit;
+PROC SQL;
+    CREATE TABLE pre_case_report_counts AS
+    SELECT 
+        SUM(od_flag) AS od_flag_before_case, 
+        SUM(fod_flag) AS fod_flag_before_case
+    FROM od_table AS a
+    INNER JOIN case_report_events AS c ON a.ID=c.ID
+    WHERE (a.year*12 + a.month) < c.case_report_period;
+QUIT;
 
 title "Counts of Events Occurring Before Case Report";
 
 proc print data=pre_case_report_counts noobs;
-run;
+RUN;
 title;
 
-proc sql;
-    create table od_table as select * from od_table where (YEAR > oud_year) or
-        (YEAR=oud_year and MONTH >= oud_month) order by ID, YEAR, MONTH;
-quit;
+PROC SQL;
+    CREATE TABLE od_table AS
+    SELECT *
+    FROM od_table
+    WHERE (YEAR > oud_year) OR (YEAR=oud_year AND MONTH >= oud_month) 
+    ORDER BY ID, YEAR, MONTH;
+QUIT;
 
 /*=========================*/
 /* 12. Sort Final OD Table */
 /*=========================*/
 
-/* Sorting the final overdose table by ID, year, and month */
+/* Sorting the final overdose table by ID, year, AND month */
 proc sort data=od_table;
     by ID year month;
-run;
+RUN;
 
 /*========================================*/
 /* 13. Merge Pregnancy Flags with OD Data */
 /*========================================*/
 
-/* Merge pregnancy flags with the overdose data. For any month/year combination, if a pregnancy flag exists, it's added to the table, otherwise the flag is set to a default value (9999). */
-proc sql;
-    create table od_table as select a.*, case when b.flag is not null then
-        b.flag else 9999 end as preg_flag from od_table a left join
-        pregnancy_flags b on a.ID=b.ID and a.month=b.month and a.year=b.year;
-quit;
+/* Merge pregnancy flags with the overdose data. For any month/year combination, if a pregnancy flag exists, it's added to the table, otherwise the flag IS set to a default value (9999). */
+PROC SQL;
+    CREATE TABLE od_table AS
+    SELECT 
+        a.*, 
+        CASE WHEN b.flag IS NOT NULL
+            THEN b.flag
+            ELSE 9999
+        END AS preg_flag
+    FROM od_table a
+    LEFT JOIN pregnancy_flags b 
+        ON a.ID=b.ID AND a.month=b.month AND a.year=b.year;
+QUIT;
 
 /*=============================================*/
 /* 14. Summarize MOUD Flag for Each Month-Year */
 /*=============================================*/
 
-/* This step reduces the dataset to unique ID-month-year combinations and retains the maximum MOUD flag value for each combination. */
-proc sql;
-    create table moud_summary as select distinct ID, month, year, has_pregnancy,
-        max(moud_flag) as moud_flag from moud_summary group by ID, year, month;
-quit;
+/* This step reduces the dataset to unique ID-month-year combinations AND retains the maximum MOUD flag value for each combination. */
+PROC SQL;
+    CREATE TABLE moud_summary AS
+    SELECT 
+        DISTINCT ID, 
+        month, 
+        year, 
+        has_pregnancy,
+        max(moud_flag) AS moud_flag
+    FROM moud_summary
+    GROUP BY ID, year, month;
+QUIT;
 
 /*====================================================*/
 /* 15. Reduce Post-Treatment Flag for Each Month-Year */
 /*====================================================*/
 
-/* Similar to the MOUD flag, we reduce the spine data to distinct ID-month-year combinations, keeping the maximum post-treatment flag for each combination. */
-proc sql;
-    create table moud_spine_posttxt as select distinct ID, month, year,
-        max(posttxt_flag) as posttxt_flag from moud_spine_posttxt group by ID,
-        year, month;
-quit;
+/* Similar to the MOUD flag, we reduce the spine data to DISTINCT ID-month-year combinations, keeping the maximum post-treatment flag for each combination. */
+PROC SQL;
+    CREATE TABLE moud_spine_posttxt AS
+    SELECT 
+        DISTINCT ID, 
+        month, 
+        year,
+        max(posttxt_flag) AS posttxt_flag
+    FROM moud_spine_posttxt
+    GROUP BY ID, year, month;
+QUIT;
 
 /*======================================================*/
-/* 16. Merge MOUD and Post-Treatment Flags with OD Data */
+/* 16. Merge MOUD AND Post-Treatment Flags with OD Data */
 /*======================================================*/
 
-/* This final merge combines both the MOUD and post-treatment flags with the overdose data, ensuring that missing flags are replaced with default values (0) where applicable. */
-proc sql;
-    create table od_table_full as select a.*, coalesce(b.has_pregnancy, 0) as
-        has_pregnancy, coalesce(b.moud_flag, 0) as moud_flag,
-        coalesce(c.posttxt_flag, 0) as posttxt_flag from od_table a left join
-        moud_summary b on a.ID=b.ID and a.month=b.month and a.year=b.year left
-        join moud_spine_posttxt c on a.ID=c.ID and a.month=c.month and
-        a.year=c.year;
-quit;
+/* This final merge combines both the MOUD AND post-treatment flags with the overdose data, ensuring that missing flags are replaced with default values (0) where applicable. */
+PROC SQL;
+    CREATE TABLE od_table_full AS
+    SELECT 
+        a.*, 
+        coalesce(b.has_pregnancy, 0) AS has_pregnancy, 
+        coalesce(b.moud_flag, 0) AS moud_flag,
+        coalesce(c.posttxt_flag, 0) AS posttxt_flag
+    FROM od_table a
+    LEFT JOIN moud_summary b 
+        ON a.ID=b.ID AND a.month=b.month AND a.year=b.year
+    LEFT JOIN moud_spine_posttxt c 
+        ON a.ID=c.ID AND a.month=c.month AND a.year=c.year;
+QUIT;
 
 /*===============================*/
 /* 17. Prepare Data for Analysis */
 /*===============================*/
 
-/* This step prepares the data by creating a unique time index based on the month and year, and categorizes individuals into different groups based on pregnancy and post-partum status.
-The 'group' variable is used to distinguish between different states, such as pregnant, post-partum, and non-pregnant.
-It then filters death records (`deaths_filtered`) and merges them with the treatment dataset to flag deaths (`death_flag`). A new dataset (`death_events`) identifies the earliest death date per individual, and post-death events such as overdoses are counted (`post_death_counts`).
-The dataset is then cleaned to remove records occurring after death. */
+/* This step prepares the data by creating a unique time index based ON the month AND year, AND categorizes individuals into different groups based ON pregnancy AND post-partum status.
+The 'group' variable IS used to distinguish between different states, such AS pregnant, post-partum, AND non-pregnant.
+It then filters death records (`deaths_filtered`) AND merges them with the treatment dataset to flag deaths (`death_flag`). A new dataset (`death_events`) identifies the earliest death date per individual, AND post-death events such AS overdoses are counted (`post_death_counts`).
+The dataset IS then cleaned to remove records occurring after death. */
 data prepared_data;
     set od_table_full;
 
     time_index=(year - 2014) * 12 + month;
 
-    /* Categorize individuals based on pregnancy and post-partum status */
+    /* Categorize individuals based ON pregnancy AND post-partum status */
     if preg_flag=1 then group=6; /* Pregnant */
     else if preg_flag=2 then group=5; /* 0-6 months post-partum */
     else if preg_flag=3 then group=4; /* 7-12 months post-partum */
     else if preg_flag=4 then group=3; /* 13-18 months post-partum */
     else if preg_flag=5 then group=3; /* 19-24 months post-partum */
     else if preg_flag=6 then group=2; /* >24 months post-partum */
-    else if preg_flag=9999 and has_pregnancy=1 then group=1;
+    else if preg_flag=9999 AND has_pregnancy=1 then group=1;
     /* Pre-first pregnancy */
-    else if preg_flag=9999 and has_pregnancy=0 then group=0;
+    else if preg_flag=9999 AND has_pregnancy=0 then group=0;
     /* Never pregnant */
-    /* Categorize individuals based on MOUD and post-treatment flags */
-    if moud_flag=1 and posttxt_flag=0 then treat_group=1; /* On MOUD */
-    else if moud_flag=1 and posttxt_flag=1 then treat_group=2; /* Post-TXT */
-    else if moud_flag=0 and posttxt_flag=0 then treat_group=0; /* No MOUD */
-run;
+    /* Categorize individuals based ON MOUD AND post-treatment flags */
+    if moud_flag=1 AND posttxt_flag=0 then treat_group=1; /* On MOUD */
+    else if moud_flag=1 AND posttxt_flag=1 then treat_group=2; /* Post-TXT */
+    else if moud_flag=0 AND posttxt_flag=0 then treat_group=0; /* No MOUD */
+RUN;
 
 /* Reduce from EPISODE_LEVEL to PERSON_LEVEL */
 PROC SORT DATA=prepared_data;
     BY ID YEAR MONTH;
 RUN;
 
-proc sql;
-    create table deaths_filtered as select ID, YEAR_DEATH, MONTH_DEATH from
-        PHDDEATH.DEATH where YEAR_DEATH in &year;
-quit;
+PROC SQL;
+    CREATE TABLE deaths_filtered AS
+    SELECT ID, YEAR_DEATH, MONTH_DEATH
+    FROM PHDDEATH.DEATH
+    WHERE YEAR_DEATH IN &year;
+QUIT;
 
 proc sort data=PREPARED_DATA;
     by ID year month;
-run;
+RUN;
 
-proc sql;
-    create table PREPARED_DATA as select a.*, b.YEAR_DEATH, b.MONTH_DEATH, case
-        when b.YEAR_DEATH=a.year and b.MONTH_DEATH=a.month then 1 else 0 end as
-        death_flag from PREPARED_DATA as a left join deaths_filtered as b on
-        a.ID=b.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PREPARED_DATA AS
+    SELECT 
+        a.*, 
+        b.YEAR_DEATH, 
+        b.MONTH_DEATH, 
+        CASE WHEN b.YEAR_DEATH=a.year AND b.MONTH_DEATH=a.month
+            THEN 1
+            ELSE 0
+        END AS death_flag
+    FROM PREPARED_DATA AS a
+    LEFT JOIN deaths_filtered AS b ON a.ID=b.ID;
+QUIT;
 
-proc sql;
-    create table death_events as select ID, min(year*12 + month) as death_period
-        from PREPARED_DATA where death_flag=1 group by ID;
-quit;
+PROC SQL;
+    CREATE TABLE death_events AS
+    SELECT ID, MIN(year*12 + month) AS death_period
+    FROM PREPARED_DATA
+    WHERE death_flag=1
+    GROUP BY ID;
+QUIT;
 
-proc sql;
-    create table post_death_counts as select sum(od_flag) as
-        od_flag_after_death, sum(fod_flag) as fod_flag_after_death from
-        PREPARED_DATA as a inner join death_events as d on a.ID=d.ID where
-        (a.year*12 + a.month) > d.death_period;
-quit;
+PROC SQL;
+    CREATE TABLE post_death_counts AS
+    SELECT 
+        SUM(od_flag) AS od_flag_after_death, 
+        SUM(fod_flag) AS fod_flag_after_death
+    FROM PREPARED_DATA AS a
+    INNER JOIN death_events AS d ON a.ID=d.ID
+    WHERE (a.year*12 + a.month) > d.death_period;
+QUIT;
 
 title "Counts of Events Occurring After Death";
 
 proc print data=post_death_counts noobs;
-run;
+RUN;
 title;
 
 data PREPARED_DATA;
@@ -4614,21 +5353,32 @@ data PREPARED_DATA;
     if first.ID then death_flag_forward=0;
     if death_flag=1 then death_flag_forward=1;
 
-    if death_flag_forward=1 and (year > YEAR_DEATH or (year=YEAR_DEATH and month
+    if death_flag_forward=1 AND (year > YEAR_DEATH OR (year=YEAR_DEATH AND month
         > MONTH_DEATH)) then delete;
 
     drop death_flag_forward;
-run;
+RUN;
 
-proc sql;
-    create table CENSORED as select a.*, b.MA2014, b.MA2015, b.MA2016, b.MA2017,
-        b.MA2018, b.MA2019, b.MA2020, b.MA2021, b.MA2022 from PREPARED_DATA as a
-        left join PHDSPINE.DEMO as b on a.ID=b.ID;
-quit;
+PROC SQL;
+    CREATE TABLE CENSORED AS
+    SELECT 
+        a.*, 
+        b.MA2014, 
+        b.MA2015, 
+        b.MA2016, 
+        b.MA2017, 
+        b.MA2018, 
+        b.MA2019, 
+        b.MA2020, 
+        b.MA2021, 
+        b.MA2022
+    FROM PREPARED_DATA AS a
+    LEFT JOIN PHDSPINE.DEMO AS b ON a.ID=b.ID;
+QUIT;
 
 proc sort data=CENSORED;
     by ID year month;
-run;
+RUN;
 
 data CENSORED2;
     set CENSORED;
@@ -4639,7 +5389,7 @@ data CENSORED2;
     do yr=2014 to 2022;
         if MAvars[yr]=1 then last_MA_year=yr;
     end;
-run;
+RUN;
 
 data CENSORED3;
     set CENSORED2;
@@ -4651,59 +5401,80 @@ data CENSORED3;
     end;
 
     if missing(last_MA_year) then censored=1;
-run;
+RUN;
 
 data PREPARED_DATA;
     set CENSORED3;
     if censored=0;
-run;
+RUN;
 
 /*=====================================*/
 /* 18. Overdoses by Pregnancy Status   */
 /*=====================================*/
 
-/* This section again repeats on above section by preparing the dataset for rate calculation. It begins by aggregating treatment data (`PREPARED_DATA`), ensuring unique records per individual and time period.
-Next, person-time (`PERSON_TIME`) is calculated for each individual, and summary statistics on overdoses and fatal overdoses are generated (`PERIOD_SUMMARY`).
-This summary is merged with demographic data (`PHDSPINE.DEMO`) to create the final dataset (`PERIOD_SUMMARY_FINAL`). Additional variables, including homelessness history and injection drug use evidence (`IDU_EVIDENCE`), are derived.
-Age is computed, and individuals are grouped into age categories. The final step involves calculating overdose rates, stratified by various demographic and risk factors using a macro (`calculate_rates`).
-Overdose rates and confidence intervals are computed for different groups, including pregnancy status, education, incarceration history, and homelessness */
-proc sql;
-    create table PREPARED_DATA_preg as select distinct ID, YEAR, MONTH, group,
-        max(moud_flag) as moud_flag, max(posttxt_flag) as posttxt_flag,
-        sum(od_flag) as od_flag, max(fod_flag) as fod_flag, min(preg_flag) as
-        preg_flag from PREPARED_DATA group by ID, YEAR, MONTH;
-quit;
+/* This section again repeats ON above section by preparing the dataset for rate calculation. It begins by aggregating treatment data (`PREPARED_DATA`), ensuring unique records per individual AND time period.
+Next, person-time (`PERSON_TIME`) IS calculated for each individual, AND summary statistics ON overdoses AND fatal overdoses are generated (`PERIOD_SUMMARY`).
+This summary IS merged with demographic data (`PHDSPINE.DEMO`) to create the final dataset (`PERIOD_SUMMARY_FINAL`). Additional variables, including homelessness history AND injection drug use evidence (`IDU_EVIDENCE`), are derived.
+Age IS computed, AND individuals are grouped into age categories. The final step involves calculating overdose rates, stratified by various demographic AND risk factors using a macro (`calculate_rates`).
+Overdose rates AND confidence intervals are computed for different groups, including pregnancy status, education, incarceration history, AND homelessness */
+PROC SQL;
+    CREATE TABLE PREPARED_DATA_preg AS
+    SELECT 
+        DISTINCT ID, 
+        YEAR, 
+        MONTH, 
+        GROUP,
+        max(moud_flag) AS moud_flag, 
+        max(posttxt_flag) AS posttxt_flag,
+        SUM(od_flag) AS od_flag, 
+        max(fod_flag) AS fod_flag, 
+        MIN(preg_flag) AS preg_flag
+    FROM PREPARED_DATA
+    GROUP BY ID, YEAR, MONTH;
+QUIT;
 
-proc sql;
-    create table PERSON_TIME as select ID, group, count(month) as person_time
-        from PREPARED_DATA_preg group by ID, group;
-quit;
+PROC SQL;
+    CREATE TABLE PERSON_TIME AS
+    SELECT ID, GROUP, count(month) AS person_time
+    FROM PREPARED_DATA_preg
+    GROUP BY ID,
+    GROUP;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY as select ID, group, sum(od_flag) as overdoses,
-        sum(fod_flag) as fatal_overdoses from PREPARED_DATA_preg group by ID,
-        group;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY AS
+    SELECT 
+        ID, GROUP, SUM(od_flag) AS overdoses, SUM(fod_flag) AS fatal_overdoses
+    FROM PREPARED_DATA_preg
+    GROUP BY ID, GROUP;
+QUIT;
 
 proc sort data=PERSON_TIME;
     by ID group;
-run;
+RUN;
 
 proc sort data=PERIOD_SUMMARY;
     by ID group;
-run;
+RUN;
 
 data PERIOD_SUMMARY;
     merge PERIOD_SUMMARY PERSON_TIME;
     by ID group;
-run;
+RUN;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY.*, cov.FINAL_RE,
-        cov.EDUCATION, cov.HOMELESS_EVER, cov.EVER_INCARCERATED,
-        cov.FOREIGN_BORN, cov.YOB from PERIOD_SUMMARY left join PHDSPINE.DEMO as
-        cov on PERIOD_SUMMARY.ID=cov.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        PERIOD_SUMMARY.*, 
+        cov.FINAL_RE,
+        cov.EDUCATION, 
+        cov.HOMELESS_EVER, 
+        cov.EVER_INCARCERATED,
+        cov.FOREIGN_BORN, 
+        cov.YOB
+    FROM PERIOD_SUMMARY
+    LEFT JOIN PHDSPINE.DEMO AS cov ON PERIOD_SUMMARY.ID=cov.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     length HOMELESS_HISTORY_GROUP $10;
@@ -4711,85 +5482,121 @@ data PERIOD_SUMMARY_FINAL;
     if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
     else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
     else HOMELESS_HISTORY_GROUP='Unknown';
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.INSURANCE_CAT,
-        cov.OTHER_SUBSTANCE_USE, cov.rural_group, cov.HCV_SEROPOSITIVE_INDICATOR
-        FROM PERIOD_SUMMARY_FINAL AS a LEFT JOIN FINAL_COHORT AS cov ON a.ID=
-        cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        cov.INSURANCE_CAT,
+        cov.OTHER_SUBSTANCE_USE, 
+        cov.rural_group, 
+        cov.HCV_SEROPOSITIVE_INDICATOR
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select *, case when ID in (select ID
-        from IJI_COHORT) then 1 else 0 end as IJI_DIAG from
-        PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        *, 
+        CASE WHEN ID IN (SELECT ID FROM IJI_COHORT)
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY_FINAL.*,
-        hcv.EVER_IDU_HCV from PERIOD_SUMMARY_FINAL left join HCV_STATUS as hcv
-        on PERIOD_SUMMARY_FINAL.ID=hcv.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT PERIOD_SUMMARY_FINAL.*, hcv.EVER_IDU_HCV
+    FROM PERIOD_SUMMARY_FINAL
+    LEFT JOIN HCV_STATUS AS hcv ON PERIOD_SUMMARY_FINAL.ID=hcv.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     set PERIOD_SUMMARY_FINAL;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
+    if EVER_IDU_HCV=1 OR IJI_DIAG=1 then IDU_EVIDENCE=1;
     else IDU_EVIDENCE=0;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.agegrp FROM
-        PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT a.*, cov.agegrp
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
 QUIT;
 
 title
-    'Overdoses, Overall; Note: Fatal Overdoses counted in Non-fatal overdoses';
+    'Overdoses, Overall; Note: Fatal Overdoses counted IN Non-fatal overdoses';
 
-proc sql;
-    select sum(overdoses) as overdoses, sum(fatal_overdoses) as fatal_overdoses,
-        sum(person_time) as total_person_time from PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    SELECT 
+        SUM(overdoses) AS overdoses, 
+        SUM(fatal_overdoses) AS fatal_overdoses,
+        SUM(person_time) AS total_person_time
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
 title 'Overdoses by Pregnancy Group, Overall';
 
-proc sql;
-    select group, count(*) as total_n, sum(overdoses) as overdoses,
-        sum(fatal_overdoses) as fatal_overdoses, sum(person_time) as
-        total_person_time, calculated overdoses / calculated total_person_time
-        as overdoses_rate format=8.4, (calculated overdoses - 1.96 *
-        sqrt(calculated overdoses)) / calculated total_person_time as
-        overdoses_rate_lower format=8.4, (calculated overdoses + 1.96 *
-        sqrt(calculated overdoses)) / calculated total_person_time as
-        overdoses_rate_upper format=8.4, calculated fatal_overdoses / calculated
-        total_person_time as fatal_overdoses_rate format=8.4, (calculated
-        fatal_overdoses - 1.96 * sqrt(calculated fatal_overdoses)) / calculated
-        total_person_time as fatal_overdoses_rate_lower format=8.4, (calculated
-        fatal_overdoses + 1.96 * sqrt(calculated fatal_overdoses)) / calculated
-        total_person_time as fatal_overdoses_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by group;
-quit;
+PROC SQL;
+    SELECT
+        GROUP, 
+        COUNT(*) AS total_n, 
+        SUM(overdoses) AS overdoses,
+        SUM(fatal_overdoses) AS fatal_overdoses, 
+        SUM(person_time) AS total_person_time, 
+        CALCULATED overdoses / CALCULATED total_person_time 
+            AS overdoses_rate format=8.4, 
+        (CALCULATED overdoses - 1.96 * sqrt(CALCULATED overdoses)) / 
+            CALCULATED total_person_time 
+            AS overdoses_rate_lower format=8.4, 
+        (CALCULATED overdoses + 1.96 * sqrt(CALCULATED overdoses)) / 
+            CALCULATED total_person_time 
+            AS overdoses_rate_upper format=8.4, 
+        CALCULATED fatal_overdoses / CALCULATED total_person_time 
+            AS fatal_overdoses_rate format=8.4, 
+        (CALCULATED fatal_overdoses - 1.96 * 
+            sqrt(CALCULATED fatal_overdoses)) / CALCULATED total_person_time 
+            AS fatal_overdoses_rate_lower format=8.4, 
+        (CALCULATED fatal_overdoses + 1.96 * 
+            sqrt(CALCULATED fatal_overdoses)) / CALCULATED total_person_time 
+            AS fatal_overdoses_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY GROUP;
+QUIT;
 
 %macro calculate_rates(group_by_vars, mytitle);
     title &mytitle;
 
-    proc sql;
-        select group, &group_by_vars, count(*) as total_n, sum(overdoses) as
-            overdoses, sum(fatal_overdoses) as fatal_overdoses, sum(person_time)
-            as total_person_time, calculated overdoses / calculated
-            total_person_time as overdoses_rate format=8.4, (calculated
-            overdoses - 1.96 * sqrt(calculated overdoses)) / calculated
-            total_person_time as overdoses_rate_lower format=8.4, (calculated
-            overdoses + 1.96 * sqrt(calculated overdoses)) / calculated
-            total_person_time as overdoses_rate_upper format=8.4, calculated
-            fatal_overdoses / calculated total_person_time as
-            fatal_overdoses_rate format=8.4, (calculated fatal_overdoses - 1.96
-            * sqrt(calculated fatal_overdoses)) / calculated total_person_time
-            as fatal_overdoses_rate_lower format=8.4, (calculated
-            fatal_overdoses + 1.96 * sqrt(calculated fatal_overdoses)) /
-            calculated total_person_time as fatal_overdoses_rate_upper
-            format=8.4 from PERIOD_SUMMARY_FINAL group by group, &group_by_vars;
-    quit;
+    PROC SQL;
+    SELECT
+        GROUP, 
+        &group_by_vars, 
+        COUNT(*) AS total_n, 
+        SUM(overdoses) AS overdoses, 
+        SUM(fatal_overdoses) AS fatal_overdoses, 
+        SUM(person_time) AS total_person_time, 
+        CALCULATED overdoses / CALCULATED total_person_time 
+            AS overdoses_rate format=8.4, 
+        (CALCULATED overdoses - 1.96 * sqrt(CALCULATED overdoses)) / 
+            CALCULATED total_person_time 
+            AS overdoses_rate_lower format=8.4, 
+        (CALCULATED overdoses + 1.96 * sqrt(CALCULATED overdoses)) / 
+            CALCULATED total_person_time 
+            AS overdoses_rate_upper format=8.4, 
+        CALCULATED fatal_overdoses / CALCULATED total_person_time 
+            AS fatal_overdoses_rate format=8.4, 
+        (CALCULATED fatal_overdoses - 1.96 * 
+            sqrt(CALCULATED fatal_overdoses)) / CALCULATED total_person_time
+            AS fatal_overdoses_rate_lower format=8.4, 
+        (CALCULATED fatal_overdoses + 1.96 * sqrt(CALCULATED fatal_overdoses)) /
+            CALCULATED total_person_time 
+            AS fatal_overdoses_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY GROUP, &group_by_vars;
+    QUIT;
 %mend calculate_rates;
 
 %calculate_rates(agegrp, 'Overdoses by Pregnancy Group, Stratified by Age');
@@ -4817,44 +5624,67 @@ title;
 /* 19. Overdoses by MOUD Treatment Status   */
 /*==========================================*/
 
-/* The same process is repeated for `treat_group`, segmenting individuals based on treatment received. The output consists of tables summarizing overdoses, person-time, and risk factors, providing insights into overdose patterns among individuals with OUD. */
-proc sql;
-    create table PREPARED_DATA_treat as select distinct ID, YEAR, MONTH,
-        treat_group, max(moud_flag) as moud_flag, max(posttxt_flag) as
-        posttxt_flag, sum(od_flag) as od_flag, max(fod_flag) as fod_flag,
-        min(preg_flag) as preg_flag from PREPARED_DATA group by ID, YEAR, MONTH;
-quit;
+/* The same process IS repeated for `treat_group`, segmenting individuals based ON treatment received. The output consists of tables summarizing overdoses, person-time, AND risk factors, providing insights into overdose patterns among individuals with OUD. */
+PROC SQL;
+    CREATE TABLE PREPARED_DATA_treat AS
+    SELECT DISTINCT 
+        ID, 
+        YEAR, 
+        MONTH,
+        treat_group, 
+        MAX(moud_flag) AS moud_flag, 
+        MAX(posttxt_flag) AS posttxt_flag, 
+        SUM(od_flag) AS od_flag, 
+        MAX(fod_flag) AS fod_flag,
+        MIN(preg_flag) AS preg_flag
+    FROM PREPARED_DATA
+    GROUP BY ID, YEAR, MONTH;
+QUIT;
 
-proc sql;
-    create table PERSON_TIME as select ID, treat_group, count(month) as
-        person_time from PREPARED_DATA_treat group by ID, treat_group;
-quit;
+PROC SQL;
+    CREATE TABLE PERSON_TIME AS
+    SELECT ID, treat_group, COUNT(month) AS person_time
+    FROM PREPARED_DATA_treat
+    GROUP BY ID, treat_group;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY as select ID, treat_group, sum(od_flag) as
-        overdoses, sum(fod_flag) as fatal_overdoses from PREPARED_DATA_treat
-        group by ID, treat_group;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY AS
+    SELECT 
+        ID, 
+        treat_group, 
+        SUM(od_flag) AS overdoses, 
+        SUM(fod_flag) AS fatal_overdoses
+    FROM PREPARED_DATA_treat
+    GROUP BY ID, treat_group;
+QUIT;
 
 proc sort data=PERSON_TIME;
     by ID treat_group;
-run;
+RUN;
 
 proc sort data=PERIOD_SUMMARY;
     by ID treat_group;
-run;
+RUN;
 
 data PERIOD_SUMMARY;
     merge PERIOD_SUMMARY PERSON_TIME;
     by ID treat_group;
-run;
+RUN;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY.*, cov.FINAL_RE,
-        cov.EDUCATION, cov.HOMELESS_EVER, cov.EVER_INCARCERATED,
-        cov.FOREIGN_BORN, cov.YOB from PERIOD_SUMMARY left join PHDSPINE.DEMO as
-        cov on PERIOD_SUMMARY.ID=cov.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        PERIOD_SUMMARY.*, 
+        cov.FINAL_RE,
+        cov.EDUCATION, 
+        cov.HOMELESS_EVER, 
+        cov.EVER_INCARCERATED,
+        cov.FOREIGN_BORN, 
+        cov.YOB
+    FROM PERIOD_SUMMARY
+    LEFT JOIN PHDSPINE.DEMO AS cov ON PERIOD_SUMMARY.ID=cov.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     length HOMELESS_HISTORY_GROUP $10;
@@ -4862,78 +5692,111 @@ data PERIOD_SUMMARY_FINAL;
     if HOMELESS_EVER=0 then HOMELESS_HISTORY_GROUP='No';
     else if 1 <= HOMELESS_EVER <= 5 then HOMELESS_HISTORY_GROUP='Yes';
     else HOMELESS_HISTORY_GROUP='Unknown';
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.INSURANCE_CAT,
-        cov.OTHER_SUBSTANCE_USE, cov.rural_group, cov.BIRTH_INDICATOR,
-        cov.HCV_SEROPOSITIVE_INDICATOR FROM PERIOD_SUMMARY_FINAL AS a LEFT JOIN
-        FINAL_COHORT AS cov ON a.ID=cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        a.*, 
+        cov.INSURANCE_CAT,
+        cov.OTHER_SUBSTANCE_USE, 
+        cov.rural_group, 
+        cov.BIRTH_INDICATOR,
+        cov.HCV_SEROPOSITIVE_INDICATOR
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN FINAL_COHORT AS cov ON a.ID=cov.ID;
 QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select *, case when ID in (select ID
-        from IJI_COHORT) then 1 else 0 end as IJI_DIAG from
-        PERIOD_SUMMARY_FINAL;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT 
+        *, 
+        CASE WHEN ID IN (SELECT ID FROM IJI_COHORT)
+            THEN 1
+            ELSE 0
+        END AS IJI_DIAG
+    FROM PERIOD_SUMMARY_FINAL;
+QUIT;
 
-proc sql;
-    create table PERIOD_SUMMARY_FINAL as select PERIOD_SUMMARY_FINAL.*,
-        hcv.EVER_IDU_HCV from PERIOD_SUMMARY_FINAL left join HCV_STATUS as hcv
-        on PERIOD_SUMMARY_FINAL.ID=hcv.ID;
-quit;
+PROC SQL;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT PERIOD_SUMMARY_FINAL.*, hcv.EVER_IDU_HCV
+    FROM PERIOD_SUMMARY_FINAL
+    LEFT JOIN HCV_STATUS AS hcv ON PERIOD_SUMMARY_FINAL.ID=hcv.ID;
+QUIT;
 
 data PERIOD_SUMMARY_FINAL;
     set PERIOD_SUMMARY_FINAL;
-    if EVER_IDU_HCV=1 or IJI_DIAG=1 then IDU_EVIDENCE=1;
+    if EVER_IDU_HCV=1 OR IJI_DIAG=1 then IDU_EVIDENCE=1;
     else IDU_EVIDENCE=0;
-run;
+RUN;
 
 PROC SQL;
-    CREATE TABLE PERIOD_SUMMARY_FINAL AS SELECT a.*, cov.agegrp FROM
-        PERIOD_SUMMARY_FINAL AS a LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
+    CREATE TABLE PERIOD_SUMMARY_FINAL AS
+    SELECT a.*, cov.agegrp
+    FROM PERIOD_SUMMARY_FINAL AS a
+    LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
 QUIT;
 
 title 'Overdoses by Treatment Group, Overall';
 
-proc sql;
-    select treat_group, count(*) as total_n, sum(overdoses) as overdoses,
-        sum(fatal_overdoses) as fatal_overdoses, sum(person_time) as
-        total_person_time, calculated overdoses / calculated total_person_time
-        as overdoses_rate format=8.4, (calculated overdoses - 1.96 *
-        sqrt(calculated overdoses)) / calculated total_person_time as
-        overdoses_rate_lower format=8.4, (calculated overdoses + 1.96 *
-        sqrt(calculated overdoses)) / calculated total_person_time as
-        overdoses_rate_upper format=8.4, calculated fatal_overdoses / calculated
-        total_person_time as fatal_overdoses_rate format=8.4, (calculated
-        fatal_overdoses - 1.96 * sqrt(calculated fatal_overdoses)) / calculated
-        total_person_time as fatal_overdoses_rate_lower format=8.4, (calculated
-        fatal_overdoses + 1.96 * sqrt(calculated fatal_overdoses)) / calculated
-        total_person_time as fatal_overdoses_rate_upper format=8.4 from
-        PERIOD_SUMMARY_FINAL group by treat_group;
-quit;
+PROC SQL;
+    SELECT 
+        treat_group, 
+        COUNT(*) AS total_n, 
+        SUM(overdoses) AS overdoses,
+        SUM(fatal_overdoses) AS fatal_overdoses, 
+        SUM(person_time) AS total_person_time, 
+        CALCULATED overdoses / CALCULATED total_person_time
+            AS overdoses_rate format=8.4, 
+        (CALCULATED overdoses - 1.96 * sqrt(CALCULATED overdoses)) / 
+            CALCULATED total_person_time 
+            AS overdoses_rate_lower format=8.4, 
+        (CALCULATED overdoses + 1.96 * sqrt(CALCULATED overdoses)) / 
+            CALCULATED total_person_time 
+            AS overdoses_rate_upper format=8.4, 
+        CALCULATED fatal_overdoses / CALCULATED total_person_time 
+            AS fatal_overdoses_rate format=8.4, 
+        (CALCULATED fatal_overdoses - 1.96 * 
+            sqrt(CALCULATED fatal_overdoses)) / CALCULATED total_person_time 
+            AS fatal_overdoses_rate_lower format=8.4, 
+        (CALCULATED fatal_overdoses + 1.96 * 
+            sqrt(CALCULATED fatal_overdoses)) / CALCULATED total_person_time 
+            AS fatal_overdoses_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY treat_group;
+QUIT;
 
 %macro calculate_rates(group_by_vars, mytitle);
     title &mytitle;
 
-    proc sql;
-        select treat_group, &group_by_vars, count(*) as total_n, sum(overdoses)
-            as overdoses, sum(fatal_overdoses) as fatal_overdoses,
-            sum(person_time) as total_person_time, calculated overdoses /
-            calculated total_person_time as overdoses_rate format=8.4,
-            (calculated overdoses - 1.96 * sqrt(calculated overdoses)) /
-            calculated total_person_time as overdoses_rate_lower format=8.4,
-            (calculated overdoses + 1.96 * sqrt(calculated overdoses)) /
-            calculated total_person_time as overdoses_rate_upper format=8.4,
-            calculated fatal_overdoses / calculated total_person_time as
-            fatal_overdoses_rate format=8.4, (calculated fatal_overdoses - 1.96
-            * sqrt(calculated fatal_overdoses)) / calculated total_person_time
-            as fatal_overdoses_rate_lower format=8.4, (calculated
-            fatal_overdoses + 1.96 * sqrt(calculated fatal_overdoses)) /
-            calculated total_person_time as fatal_overdoses_rate_upper
-            format=8.4 from PERIOD_SUMMARY_FINAL group by treat_group,
-            &group_by_vars;
-    quit;
+    PROC SQL;
+    SELECT 
+        treat_group, 
+        &group_by_vars, 
+        COUNT(*) AS total_n, 
+        SUM(overdoses) AS overdoses, 
+        SUM(fatal_overdoses) AS fatal_overdoses,
+        SUM(person_time) AS total_person_time, 
+        CALCULATED overdoses / CALCULATED total_person_time 
+            AS overdoses_rate format=8.4,
+        (CALCULATED overdoses - 1.96 * sqrt(CALCULATED overdoses)) /
+            CALCULATED total_person_time 
+            AS overdoses_rate_lower format=8.4,
+        (CALCULATED overdoses + 1.96 * sqrt(CALCULATED overdoses)) /
+            CALCULATED total_person_time 
+            AS overdoses_rate_upper format=8.4,
+        CALCULATED fatal_overdoses / CALCULATED total_person_time 
+            AS fatal_overdoses_rate format=8.4, 
+        (CALCULATED fatal_overdoses - 1.96 * 
+            sqrt(CALCULATED fatal_overdoses)) / CALCULATED total_person_time
+            AS fatal_overdoses_rate_lower format=8.4, 
+        (CALCULATED fatal_overdoses + 1.96 * sqrt(CALCULATED fatal_overdoses)) /
+            CALCULATED total_person_time 
+            AS fatal_overdoses_rate_upper format=8.4
+    FROM PERIOD_SUMMARY_FINAL
+    GROUP BY treat_group, &group_by_vars;
+    QUIT;
 %mend calculate_rates;
 
 %calculate_rates(agegrp, 'Overdoses by Treatment Group, Stratified by Age');
@@ -4965,10 +5828,10 @@ title;
 /*==========================================*/
 data FINAL_COHORT_FILT;
     set FINAL_COHORT;
-    if FINAL_RE NE 9 and EDUCATION_GROUP NE 'Other or Unknown' and
-        HOMELESS_HISTORY_GROUP NE 'Unknown' and INSURANCE_CAT NE
+    if FINAL_RE NE 9 AND EDUCATION_GROUP NE 'Other OR Unknown' AND
+        HOMELESS_HISTORY_GROUP NE 'Unknown' AND INSURANCE_CAT NE
         'Other/Missing';
-run;
+RUN;
 
 %macro run_glimmix(outcome=, modelnum=11);
 
@@ -4984,7 +5847,7 @@ run;
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE CONFIRMED_HCV_INDICATOR rural_group / dist=binary
             link=logit solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5008,7 +5871,7 @@ run;
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE rural_group / dist=binary link=logit solution
             oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5030,7 +5893,7 @@ run;
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             CONFIRMED_HCV_INDICATOR rural_group / dist=binary link=logit
             solution oddsratio;
-    run;
+    RUN;
 %mend run_glimmix;
 
 %run_glimmix(outcome=EVER_MOUD);
@@ -5051,7 +5914,7 @@ run;
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE LANGUAGE_SPOKEN_GROUP rural_group / dist=binary
             link=logit solution oddsratio;
-    run;
+    RUN;
 %mend run_glimmix;
 
 %run_glimmix(outcome=EVER_MOUD);
@@ -5073,7 +5936,7 @@ run;
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             CONFIRMED_HCV_INDICATOR LANGUAGE_SPOKEN_GROUP rural_group /
             dist=binary link=logit solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5097,7 +5960,7 @@ run;
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE CONFIRMED_HCV_INDICATOR LANGUAGE_SPOKEN_GROUP
             rural_group / dist=binary link=logit solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5115,13 +5978,13 @@ run;
         class FINAL_RE (ref='1') INSURANCE_CAT (ref='Medicaid') agegrp_num
             (ref='3') OTHER_SUBSTANCE_USE (ref='0') EVER_INCARCERATED (ref='0')
             HOMELESS_HISTORY_GROUP (ref='No') IDU_EVIDENCE (ref='0')
-            CONFIRMED_HCV_INDICATOR (ref='0') EDUCATION_GROUP (ref='HS or less')
+            CONFIRMED_HCV_INDICATOR (ref='0') EDUCATION_GROUP (ref='HS OR less')
             rural_group (ref='Urban');
         model &outcome(event='1')=FINAL_RE INSURANCE_CAT agegrp_num
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE CONFIRMED_HCV_INDICATOR EDUCATION_GROUP rural_group /
             dist=binary link=logit solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5139,12 +6002,12 @@ run;
         class FINAL_RE (ref='1') INSURANCE_CAT (ref='Medicaid') agegrp_num
             (ref='3') OTHER_SUBSTANCE_USE (ref='0') EVER_INCARCERATED (ref='0')
             HOMELESS_HISTORY_GROUP (ref='No') IDU_EVIDENCE (ref='0')
-            EDUCATION_GROUP (ref='HS or less') rural_group (ref='Urban');
+            EDUCATION_GROUP (ref='HS OR less') rural_group (ref='Urban');
         model &outcome(event='1')=FINAL_RE INSURANCE_CAT agegrp_num
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE EDUCATION_GROUP rural_group / dist=binary link=logit
             solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5162,12 +6025,12 @@ run;
         class FINAL_RE (ref='1') INSURANCE_CAT (ref='Medicaid') agegrp_num
             (ref='3') OTHER_SUBSTANCE_USE (ref='0') EVER_INCARCERATED (ref='0')
             HOMELESS_HISTORY_GROUP (ref='No') CONFIRMED_HCV_INDICATOR (ref='0')
-            EDUCATION_GROUP (ref='HS or less') rural_group (ref='Urban');
+            EDUCATION_GROUP (ref='HS OR less') rural_group (ref='Urban');
         model &outcome(event='1')=FINAL_RE INSURANCE_CAT agegrp_num
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             CONFIRMED_HCV_INDICATOR EDUCATION_GROUP rural_group / dist=binary
             link=logit solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
@@ -5185,13 +6048,13 @@ run;
         class FINAL_RE (ref='1') INSURANCE_CAT (ref='Medicaid') agegrp_num
             (ref='3') OTHER_SUBSTANCE_USE (ref='0') EVER_INCARCERATED (ref='0')
             HOMELESS_HISTORY_GROUP (ref='No') IDU_EVIDENCE (ref='0')
-            EDUCATION_GROUP (ref='HS or less') rural_group (ref='Urban')
+            EDUCATION_GROUP (ref='HS OR less') rural_group (ref='Urban')
             LANGUAGE_SPOKEN_GROUP (ref='English');
         model &outcome(event='1')=FINAL_RE INSURANCE_CAT agegrp_num
             OTHER_SUBSTANCE_USE EVER_INCARCERATED HOMELESS_HISTORY_GROUP
             IDU_EVIDENCE EDUCATION_GROUP rural_group LANGUAGE_SPOKEN_GROUP /
             dist=binary link=logit solution oddsratio;
-    run;
+    RUN;
 
 %mend run_glimmix;
 
