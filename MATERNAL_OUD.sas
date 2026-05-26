@@ -191,10 +191,7 @@ PROC SQL;
         a.ID, a.year_apcd, a.month_apcd, MAX(a.oud_apcd) AS oud_apcd
     FROM apcd a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_apcd) AS year_apcd
-    FROM apcd
-    GROUP BY ID) AS b 
+        (SELECT ID, MIN(year_apcd) AS year_apcd FROM apcd GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_apcd=b.year_apcd
     GROUP BY a.ID, a.year_apcd, a.month_apcd;
 QUIT;
@@ -218,10 +215,7 @@ PROC SQL;
         a.ID, a.year_pharm, a.month_pharm, MAX(a.oud_pharm) AS oud_pharm
     FROM pharm a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_pharm) AS year_pharm
-    FROM pharm
-    GROUP BY ID) AS b
+        (SELECT ID, MIN(year_pharm) AS year_pharm FROM pharm GROUP BY ID) AS b
         ON a.ID=b.ID AND a.year_pharm=b.year_pharm
     GROUP BY a.ID, a.year_pharm, a.month_pharm;
 QUIT;
@@ -327,22 +321,22 @@ QUIT;
 /* CASEMIX ED MERGE */
 PROC SQL;
     CREATE TABLE pharm AS
-    SELECT DISTINCT *
-    FROM pharm;
+    SELECT DISTINCT * FROM pharm;
+
     CREATE TABLE casemix_ed_proc AS
-    SELECT DISTINCT *
-    FROM casemix_ed_proc;
+    SELECT DISTINCT * FROM casemix_ed_proc;
+    
     CREATE TABLE apcd AS
-    SELECT DISTINCT *
-    FROM apcd;
+    SELECT DISTINCT * FROM apcd;
+    
     CREATE TABLE casemix_ed AS
-    SELECT DISTINCT *
-    FROM casemix_ed;
+    SELECT DISTINCT * FROM casemix_ed;
+    
     CREATE TABLE casemix_ed_diag AS
-    SELECT DISTINCT *
-    FROM casemix_ed_diag;
+    SELECT DISTINCT * FROM casemix_ed_diag;
+    
     CREATE TABLE casemix AS
-    SELECT *
+    SELECT * 
     FROM casemix_ed
     LEFT JOIN casemix_ed_diag 
             ON casemix_ed.ED_ID=casemix_ed_diag.ED_ID
@@ -364,10 +358,7 @@ PROC SQL;
         a.ID, a.year_cm, a.month_cm, MAX(a.oud_ed) AS oud_ed
     FROM casemix a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_cm) AS year_cm
-    FROM casemix
-    GROUP BY ID) b 
+        (SELECT ID, MIN(year_cm) AS year_cm FROM casemix GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_cm=b.year_cm
     GROUP BY a.ID, a.year_cm, a.month_cm;
 QUIT;
@@ -404,8 +395,7 @@ PROC SQL;
     SELECT a.ID, a.HD_ID, a.HD_ADMIT_YEAR, b.oud_hd_diag
     FROM PHDCM.HD AS a
     RIGHT JOIN hd_diag AS b ON a.HD_ID=b.HD_ID
-    WHERE
-            a.HD_ADMIT_YEAR IN &year;
+    WHERE a.HD_ADMIT_YEAR IN &year;
 QUIT;
 
 /* HD PROC DATA */
@@ -423,27 +413,26 @@ PROC SQL;
     SELECT a.ID, a.HD_ID, a.HD_ADMIT_YEAR, b.oud_hd_proc
     FROM PHDCM.HD AS a
     RIGHT JOIN hd_proc AS b ON a.HD_ID=b.HD_ID
-    WHERE
-        a.HD_ADMIT_YEAR IN &year;
+    WHERE a.HD_ADMIT_YEAR IN &year;
 QUIT;
 
 /* HD MERGE */
 PROC SQL;
     CREATE TABLE pharm AS
-    SELECT DISTINCT *
-    FROM pharm;
+    SELECT DISTINCT * FROM pharm;
+
     CREATE TABLE hd_diag AS
-    SELECT DISTINCT *
-    FROM hd_diag;
+    SELECT DISTINCT * FROM hd_diag;
+
     CREATE TABLE casemix AS
-    SELECT DISTINCT *
-    FROM casemix;
+    SELECT DISTINCT * FROM casemix;
+
     CREATE TABLE hd AS
-    SELECT DISTINCT *
-    FROM hd;
+    SELECT DISTINCT * FROM hd;
+
     CREATE TABLE hd_proc AS
-    SELECT DISTINCT *
-    FROM hd_proc;
+    SELECT DISTINCT * FROM hd_proc;
+
     CREATE TABLE hd AS
     SELECT *
     FROM hd
@@ -465,10 +454,7 @@ PROC SQL;
         a.ID, a.year_hd, a.month_hd, MAX(a.oud_hd) AS oud_hd
     FROM hd a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_hd) AS year_hd
-    FROM hd
-    GROUP BY ID) b 
+        (SELECT ID, MIN(year_hd) AS year_hd FROM hd GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_hd=b.year_hd
     GROUP BY a.ID, a.year_hd, a.month_hd;
 QUIT;
@@ -510,10 +496,7 @@ PROC SQL;
         a.ID, a.year_oo, a.month_oo, MAX(a.oud_oo) AS oud_oo
     FROM oo a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_oo) AS year_oo
-    FROM oo
-    GROUP BY ID) b 
+        (SELECT ID, MIN(year_oo) AS year_oo FROM oo GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_oo=b.year_oo
     GROUP BY a.ID, a.year_oo, a.month_oo;
 QUIT;
@@ -596,10 +579,7 @@ PROC SQL;
         AS oud_bsas
     FROM bsas a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_bsas) AS year_bsas
-    FROM bsas
-    GROUP BY ID) b 
+        (SELECT ID, MIN(year_bsas) AS year_bsas FROM bsas GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_bsas=b.year_bsas
     GROUP BY a.ID, a.year_bsas, a.month_bsas;
 QUIT;
@@ -631,10 +611,7 @@ PROC SQL;
         a.ID, a.year_matris, a.month_matris, MAX(a.oud_matris) AS oud_matris
     FROM matris a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_matris) AS year_matris
-    FROM matris
-    GROUP BY ID) b
+        (SELECT ID, MIN(year_matris) AS year_matris FROM matris GROUP BY ID) b
         ON a.ID=b.ID AND a.year_matris=b.year_matris
     GROUP BY a.ID, a.year_matris, a.month_matris;
 QUIT;
@@ -666,10 +643,7 @@ PROC SQL;
         a.ID, a.year_death, a.month_death, MAX(a.oud_death) AS oud_death
     FROM death a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_death) AS year_death
-    FROM death
-    GROUP BY ID) b 
+        (SELECT ID, MIN(year_death) AS year_death FROM death GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_death=b.year_death
     GROUP BY a.ID, a.year_death, a.month_death;
 QUIT;
@@ -698,10 +672,7 @@ PROC SQL;
         a.ID, a.year_pmp, a.month_pmp, MAX(a.oud_pmp) AS oud_pmp
     FROM pmp a
     INNER JOIN 
-        (
-    SELECT ID, MIN(year_pmp) AS year_pmp
-    FROM pmp
-    GROUP BY ID) b 
+        (SELECT ID, MIN(year_pmp) AS year_pmp FROM pmp GROUP BY ID) AS b 
         ON a.ID=b.ID AND a.year_pmp=b.year_pmp
     GROUP BY a.ID, a.year_pmp, a.month_pmp;
 QUIT;
@@ -729,21 +700,20 @@ output the count of those detected with OUD
 any zeros are true zeros */
 PROC SQL;
     CREATE TABLE oo AS
-    SELECT DISTINCT *
-    FROM oo;
+    SELECT DISTINCT * FROM oo;
+
     CREATE TABLE bsas AS
-    SELECT DISTINCT *
-    FROM bsas;
+    SELECT DISTINCT * FROM bsas;
+
     CREATE TABLE matris AS
-    SELECT DISTINCT *
-    FROM matris;
+    SELECT DISTINCT * FROM matris;
+
     CREATE TABLE death AS
-    SELECT DISTINCT *
-    FROM death;
+    SELECT DISTINCT * FROM death;
+    
     CREATE TABLE pmp AS
-    SELECT DISTINCT *
-    FROM pmp;
-PROC SQL;
+    SELECT DISTINCT * FROM pmp;
+    
     CREATE TABLE oud AS
     SELECT *
     FROM demographics
