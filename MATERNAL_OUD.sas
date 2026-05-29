@@ -3781,12 +3781,14 @@ IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND
 
     PROC SQL;
         CREATE TABLE pregnancy_summary AS
-    SELECT 
-        ID, 
-        MIN(pregnancy_start_month) AS first_preg_month, 
-        MIN(pregnancy_start_year) AS first_preg_year
-    FROM pregnancy_flags
-    GROUP BY ID;
+        SELECT DISTINCT
+            ID,
+            pregnancy_start_month AS first_preg_month,
+            pregnancy_start_year AS first_preg_year
+        FROM pregnancy_flags
+        GROUP BY ID
+        HAVING MDY(pregnancy_start_month, 1, pregnancy_start_year) =
+            MIN(MDY(pregnancy_start_month, 1, pregnancy_start_year));
     QUIT;
 
     PROC SQL;
