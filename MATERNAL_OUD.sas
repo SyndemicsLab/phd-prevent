@@ -1085,6 +1085,133 @@ PROC SQL;
     ORDER BY ID, new_start_year, new_start_month;
 QUIT;
 
+/***************************************************************************/
+/* DIAGNOSTIC M1: Missing/invalid episode boundary dates                   */
+/***************************************************************************/
+
+title "DIAGNOSTIC M1A: Missing start dates";
+
+proc sql;
+    select count(*) as missing_new_start_date
+    from moud_demo
+    where missing(new_start_date);
+quit;
+
+title "DIAGNOSTIC M1B: Missing end dates";
+
+proc sql;
+    select count(*) as missing_new_end_date
+    from moud_demo
+    where missing(new_end_date);
+quit;
+
+title "DIAGNOSTIC 1C: End date before start";
+
+proc sql;
+    select count(*) as invalid_episodes
+    from moud_demo
+    where new_end_date < new_start_date;
+quit;
+
+title "DIAGNOSTIC 1D: End month/year before start";
+
+proc sql;
+    select count(*) as invalid_episodes
+    from moud_demo
+    where new_end_date < new_start_date
+       or new_end_year < new_start_year
+       or (new_end_year = new_start_year
+           and new_end_month < new_start_month);
+quit;
+
+/* EXPECTED:
+   0
+*/
+
+/***************************************************************************/
+/* DIAGNOSTIC 2: Residual episode overlap                                 */
+/***************************************************************************/
+
+proc sort data=moud_demo;
+    by ID new_start_date;
+run;
+
+data overlap_check;
+    set moud_demo;
+    by ID;
+
+    retain prev_end_date;
+
+    if first.ID then prev_end_date=.;
+
+    overlap_flag = 0;
+
+    if not first.ID then do;
+        if new_start_date < prev_end_date then
+            overlap_flag = 1;
+    end;
+
+    prev_end_date = new_end_date;
+run;
+
+title "DIAGNOSTIC 2: Episodes beginning before prior episode ends";
+
+proc sql;
+    select
+        sum(overlap_flag) as overlapping_episodes,
+        count(*) as total_episodes
+    from overlap_check;
+quit;
+
+/* EXPECTED:
+   overlapping_episodes = 0
+*/
+
+/***************************************************************************/
+/* DIAGNOSTIC 3: Episode numbering                                        */
+/***************************************************************************/
+
+title "DIAGNOSTIC 3: Duplicate episode IDs";
+
+proc sql;
+    select
+        count(*) as duplicate_episode_ids
+    from (
+        select episode_id,
+               count(*) as n
+        from moud_demo
+        group by episode_id
+        having calculated n > 1
+    );
+quit;
+
+/* EXPECTED:
+   0
+*/
+
+/***************************************************************************/
+/* DIAGNOSTIC 4: Explore gap		                                       */
+/***************************************************************************/
+
+data gap_check;
+    set moud_demo;
+    by ID;
+
+    retain prev_end_date;
+
+    if first.ID then gap_days=.;
+
+    else gap_days = new_start_date - prev_end_date;
+
+    prev_end_date = new_end_date;
+run;
+
+title "DIAGNOSTIC 4: Distribution of gaps between episodes";
+
+proc means data=gap_check n min p1 p5 p25 median p75 p95 max;
+    var gap_days;
+run;
+
 /*===============================================*/
 /* 3. Summary Statistics for MOUD Participants  */
 /*===============================================*/
@@ -4365,6 +4492,208 @@ data moud_spine_preg;
     /* Never pregnant */
 RUN;
 
+/***************************************************************************/
+/* DIAGNOSTIC 1A: Initiations per episode                                  */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Verify that every cleaned MOUD episode generates exactly one            */
+/* initiation event.                                                       */
+/*                                                                         */
+/* EXPECTED:                                                               */
+/*   min_init = 1                                                          */
+/*   max_init = 1                                                          */
+/*   episodes_with_no_init = 0                                             */
+/*   episodes_with_multiple_init = 0                                       */
+/***************************************************************************/
+
+title "DIAGNOSTIC 1A: Initiations per episode";
+
+proc sql;
+    select
+        min(n_init) as min_init,
+        max(n_init) as max_init,
+        sum(case when n_init=0 then 1 else 0 end)
+            as episodes_with_no_init,
+        sum(case when n_init>1 then 1 else 0 end)
+            as episodes_with_multiple_init
+    from (
+        select
+            episode_id,
+            sum(moud_init) as n_init
+        from moud_table
+        group by episode_id
+    );
+quit;
+
+/***************************************************************************/
+/* DIAGNOSTIC 1B: Episode count versus initiation count                    */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Verify that the number of MOUD episodes equals the number of            */
+/* initiation events.                                                      */
+/*                                                                         */
+/* EXPECTED:                                                               */
+/*   total_episodes = total_initiations                                    */
+/***************************************************************************/
+
+title "DIAGNOSTIC 1B: Episode count versus initiation count";
+
+proc sql;
+    select
+        count(distinct episode_id) as total_episodes,
+        sum(moud_init) as total_initiations
+    from moud_table;
+quit;
+
+/***************************************************************************/
+/* DIAGNOSTIC 2A: Impossible pregnancy states                              */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Verify that women marked as never pregnant never receive a pregnancy    */
+/* timing flag.                                                            */
+/*                                                                         */
+/* EXPECTED:                                                               */
+/*   n_impossible = 0                                                      */
+/***************************************************************************/
+
+title "DIAGNOSTIC 2A: Impossible pregnancy states";
+
+proc sql;
+    select count(*) as n_impossible
+    from moud_spine_preg
+    where has_pregnancy=0
+      and group ne 0;
+quit;
+
+/***************************************************************************/
+/* DIAGNOSTIC 2B: Pregnancy flag consistency                               */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Identify women classified as having a pregnancy who never enter any     */
+/* pregnancy/postpartum period.                                            */
+/*                                                                         */
+/* EXPECTED:                                                               */
+/*   n_impossible = 0                                                      */
+/***************************************************************************/
+
+title "DIAGNOSTIC 2B: Women with has_pregnancy=1 but never leave 9999";
+
+proc sql;
+    select count(*) as n_impossible
+    from (
+        select ID
+        from moud_spine_preg
+        group by ID
+        having max(case when group in (1,2,3,4,5,6)
+                        then 1 else 0 end)=0
+           and max(has_pregnancy)=1
+    );
+quit;
+
+title "DIAGNOSTIC 2C: Missing initiation classification at spine level";
+
+proc sql;
+    select count(*) as n_impossible
+    from moud_spine_preg
+    where moud_init=1
+      and group ne 0
+      and missing(moud_start_group);
+quit;
+
+/***************************************************************************/
+/* DIAGNOSTIC 3: INITIATION ASSIGNMENT CHECK                               */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Verify values of group before any aggregation or joins occur.  		   */
+/*                                                                         */
+/* KEY QUESTION:                                                           */
+/* Do valid initiation events already have missing classification?         */
+/***************************************************************************/
+
+title "DIAGNOSTIC 3A: Distribution of pregnancy group at initiation";
+
+proc sql;
+    select
+        group,
+        count(*) as n
+    from moud_spine_preg
+    where moud_init = 1
+    group by group
+    order by group;
+quit;
+
+/* EXPECTED:
+   groups 0-6 present 
+*/
+
+title "DIAGNOSTIC 3B: Missing classification at initiation";
+
+proc sql;
+    select
+        count(*) as n_impossible
+    from moud_spine_preg
+    where moud_init = 1
+      and group in (1,2,3,4,5,6)
+      and missing(moud_start_group);
+quit;
+
+/* EXPECTED:
+   SHOULD BE 0
+*/
+
+title "Diagnostic 3C: Initiation classification cross-tab";
+
+proc sql;
+    select
+        has_pregnancy,
+        group,
+        moud_start_group,
+        count(*) as n
+    from moud_spine_preg
+    where moud_init = 1
+    group by has_pregnancy, group, moud_start_group
+    order by has_pregnancy, group, moud_start_group;
+quit;
+
+/***************************************************************************/
+/* DIAGNOSTIC 3D: PREGNANCY TIMING VS INITIATION CLASSIFICATION            */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Verify that MOUD initiation events are assigned to the correct          */
+/* moud_start_group category based on pregnancy timing.                    */
+/*                                                                         */
+/* This directly tests the classification logic:                           */
+/*   preg_flag = 9999  -> moud_start_group = 1 (before pregnancy)          */
+/*   preg_flag = 1     -> moud_start_group = 2 (during pregnancy)          */
+/*   preg_flag = 2-6   -> moud_start_group = 3 (after pregnancy)           */
+/*                                                                         */
+/* KEY QUESTION:                                                           */
+/* Are initiation events being assigned to the expected pregnancy-relative */
+/* MOUD start category?                                                    */
+/***************************************************************************/
+
+title "DIAGNOSTIC 3D: Pregnancy timing vs initiation classification";
+
+proc sql;
+    select
+        preg_flag,
+        moud_start_group,
+        count(*) as n
+    from moud_spine_preg
+    where moud_init = 1
+    group by preg_flag, moud_start_group
+    order by preg_flag, moud_start_group;
+quit;
+
+/* EXPECTED:
+   preg_flag = 9999 should only appear with moud_start_group = 1
+   preg_flag = 1    should only appear with moud_start_group = 2
+   preg_flag = 2-6  should only appear with moud_start_group = 3
+
+   Any other combination indicates an error in the initiation
+   classification logic.
+*/
+
 PROC SQL;
     CREATE TABLE collapsed AS
     SELECT 
@@ -4391,6 +4720,140 @@ PROC SQL;
     LEFT JOIN collapsed b 
         ON a.ID=b.ID AND a.year=b.year AND a.month=b.month;
 QUIT;
+
+/***************************************************************************/
+/* DIAGNOSTIC 4: COLLAPSE STEP VALIDATION                                 */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Test whether aggregation destroys valid moud_start_group values.       */
+/*                                                                         */
+/* KEY QUESTION:                                                           */
+/* Does collapsing multiple rows per ID-month introduce missing values?    */
+/***************************************************************************/
+
+title "DIAGNOSTIC 4A: Missing start group after collapse";
+
+proc sql;
+    select
+        count(*) as n_impossible
+    from collapsed
+    where moud_init = 1
+      and group in (1,2,3,4,5,6)
+      and missing(moud_start_group);
+quit;
+
+/* EXPECTED:
+   SHOULD NOT increase vs Diagnostic 3B
+*/
+
+title "Diagnostic 4B: Post-collapse initiation cross-tab";
+
+proc sql;
+    select
+        has_pregnancy,
+        group,
+        moud_start_group,
+        count(*) as n
+    from collapsed
+    where moud_init = 1
+    group by has_pregnancy, group, moud_start_group
+    order by has_pregnancy, group, moud_start_group;
+quit;
+
+title "DIAGNOSTIC 4C: Row survival check across collapse";
+
+proc sql;
+create table compare_inits as
+select
+    a.ID,
+    a.episode_id,
+    a.year,
+    a.month,
+    a.moud_start_group as episode_group,
+    b.moud_start_group as collapsed_group
+from moud_spine_preg a
+left join collapsed b
+    on a.ID=b.ID
+   and a.year=b.year
+   and a.month=b.month
+where a.moud_init=1;
+quit;
+
+proc freq data=compare_inits;
+    tables episode_group*collapsed_group /
+        missing
+        nopercent
+        norow
+        nocol;
+run;
+
+/***************************************************************************/
+/* DIAGNOSTIC 5: PREGNANCY CONSISTENCY CHECK                               */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Ensure pregnancy status aligns with group classification.              */
+/***************************************************************************/
+
+title "DIAGNOSTIC 5A: Pregnancy vs group consistency";
+
+proc sql;
+    select
+        has_pregnancy,
+        group,
+        count(*) as n
+    from collapsed
+    group by has_pregnancy, group
+    order by has_pregnancy, group;
+quit;
+
+/* EXPECTED:
+   group=0 only when has_pregnancy=0
+   group 1–6 only when has_pregnancy=1
+*/
+
+title "DIAGNOSTIC 5B: Impossible states check";
+
+proc sql;
+    select
+        count(*) as n_impossible
+    from collapsed
+    where group in (1,2,3,4,5,6)
+      and has_pregnancy = 0;
+quit;
+
+/* EXPECTED:
+   SHOULD BE 0
+*/
+
+/***************************************************************************/
+/* DIAGNOSTIC 6: Missing after join                                       */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Verify that valid initiation classifications survive the merge back     */
+/* into PREPARED_DATA.                                                     */
+/*                                                                         */
+/* EXPECTED:                                                               */
+/*   n_impossible = 0                                                         */
+/***************************************************************************/
+
+title "DIAGNOSTIC 6: Missing after join";
+
+proc sql;
+    select
+        count(*) as n_impossible
+    from prepared_data
+    where moud_init = 1
+      and group in (1,2,3,4,5,6)
+      and missing(moud_start_group);
+quit;
+
+/* EXPECTED:
+   SHOULD BE 0 unless join is failing
+*/
+
+data prepared_data_pre_cf ;
+    set PREPARED_DATA;
+run;
 
 data PREPARED_DATA;
     set PREPARED_DATA;
@@ -4432,6 +4895,123 @@ data PREPARED_DATA;
 
     drop moud_start_group_cf pending_moud_start_group;
 RUN;
+
+/***************************************************************************/
+/* DIAGNOSTIC 7: Missing during active MOUD exposure                      */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Identify active MOUD months where the carried-forward initiation        */
+/* classification is missing.                                              */
+/*                                                                         */
+/* EXPECTED:                                                               */
+/*   Ideally 0.                                                            */
+/*   Non-zero values indicate that initiation information was never        */
+/*   assigned or was lost later in the pipeline.                           */
+/***************************************************************************/
+
+title "DIAGNOSTIC 7A: Missing after carry-forward (active MOUD)";
+
+proc sql;
+    select
+        count(*) as n_impossible
+    from prepared_data
+    where moud_flag = 1
+      and group in (1,2,3,4,5,6)
+      and missing(moud_start_group);
+quit;
+
+/* EXPECTED:
+   SHOULD BE 0
+*/
+
+/***************************************************************************/
+/* DIAGNOSTIC 8: FULL CONSISTENCY CHECK                                   */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Identify impossible combinations of variables.                         */
+/***************************************************************************/
+
+title "DIAGNOSTIC 8A: Full structural cross-tab";
+
+proc sql;
+    select
+        group,
+        moud_flag,
+        moud_init,
+        moud_start_group,
+        count(*) as n
+    from prepared_data
+    group by group, moud_flag, moud_init, moud_start_group
+    order by group, moud_flag, moud_init, moud_start_group;
+quit;
+
+/* EXPECTED RULES:
+   - group=0 → moud_start_group must be .
+   - group 1-6 AND moud_init=1 → should NEVER be .
+   - moud_flag=1 AND group 1-6 → should NEVER be missing start group
+*/
+
+/***************************************************************************/
+/* DIAGNOSTIC 8B: CHARACTERIZATION OF PROBLEMATIC ROWS                     */
+/*                                                                         */
+/* PURPOSE:                                                                */
+/* Summarize the structure of observations where moud_start_group is       */
+/* missing despite the individual being classified into a pregnancy-stage  */
+/* group (group = 1-6).                                                    */
+/*                                                                         */
+/* This helps determine whether missing values are concentrated in:        */
+/*   - active MOUD months                                                  */
+/*   - initiation months                                                   */
+/*   - cessation months                                                    */
+/*   - specific pregnancy stages                                           */
+/*                                                                         */
+/* KEY QUESTION:                                                           */
+/* Do the problematic observations share a common combination of           */
+/* pregnancy stage and MOUD status that points to the source of the bug?   */
+/***************************************************************************/
+
+title "DIAGNOSTIC 8B: Problematic rows by pregnancy stage";
+
+proc sql;
+    select
+        group,
+        moud_flag,
+        moud_init,
+        moud_cessation,
+        count(*) as n
+    from prepared_data
+    where missing(moud_start_group)
+      and group in (1,2,3,4,5,6)
+    group by
+        group,
+        moud_flag,
+        moud_init,
+        moud_cessation
+    order by
+        group,
+        moud_flag,
+        moud_init,
+        moud_cessation;
+quit;
+
+/* EXPECTED:
+   Ideally, no observations should appear because individuals classified
+   into pregnancy-stage groups (1-6) should have a non-missing
+   moud_start_group.
+
+   If observations do appear, look for concentration within particular:
+       - pregnancy stages (group)
+       - MOUD-active months (moud_flag=1)
+       - initiation months (moud_init=1)
+       - cessation months (moud_cessation=1)
+
+   Strong clustering within a specific combination may help identify
+   whether the bug originates during:
+       - initiation classification,
+       - episode aggregation,
+       - carry-forward logic, or
+       - cessation handling.
+*/
 
 PROC SQL;
     CREATE TABLE PERSON_TIME AS
