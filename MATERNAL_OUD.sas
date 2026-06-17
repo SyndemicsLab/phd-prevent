@@ -1056,7 +1056,7 @@ QUIT;
 
 data moud_demo;
     set moud_demo;
-    where new_start_year >= 2014;
+    WHERE new_start_year >= 2014;
 RUN;
 
 PROC SQL;
@@ -1092,33 +1092,33 @@ QUIT;
 title "DIAGNOSTIC M1A: Missing start dates";
 
 proc sql;
-    select count(*) as missing_new_start_date
-    from moud_demo
-    where missing(new_start_date);
+    SELECT count(*) as missing_new_start_date
+    FROM moud_demo
+    WHERE missing(new_start_date);
 quit;
 
 title "DIAGNOSTIC M1B: Missing end dates";
 
 proc sql;
-    select count(*) as missing_new_end_date
-    from moud_demo
-    where missing(new_end_date);
+    SELECT count(*) as missing_new_end_date
+    FROM moud_demo
+    WHERE missing(new_end_date);
 quit;
 
 title "DIAGNOSTIC 1C: End date before start";
 
 proc sql;
-    select count(*) as invalid_episodes
-    from moud_demo
-    where new_end_date < new_start_date;
+    SELECT count(*) as invalid_episodes
+    FROM moud_demo
+    WHERE new_end_date < new_start_date;
 quit;
 
 title "DIAGNOSTIC 1D: End month/year before start";
 
 proc sql;
-    select count(*) as invalid_episodes
-    from moud_demo
-    where new_end_date < new_start_date
+    SELECT count(*) as invalid_episodes
+    FROM moud_demo
+    WHERE new_end_date < new_start_date
        or new_end_year < new_start_year
        or (new_end_year = new_start_year
            and new_end_month < new_start_month);
@@ -1157,10 +1157,10 @@ run;
 title "DIAGNOSTIC 2: Episodes beginning before prior episode ends";
 
 proc sql;
-    select
+    SELECT
         sum(overlap_flag) as overlapping_episodes,
         count(*) as total_episodes
-    from overlap_check;
+    FROM overlap_check;
 quit;
 
 /* EXPECTED:
@@ -1174,12 +1174,12 @@ quit;
 title "DIAGNOSTIC 3: Duplicate episode IDs";
 
 proc sql;
-    select
+    SELECT
         count(*) as duplicate_episode_ids
-    from (
-        select episode_id,
+    FROM (
+        SELECT episode_id,
                count(*) as n
-        from moud_demo
+        FROM moud_demo
         group by episode_id
         having calculated n > 1
     );
@@ -1563,7 +1563,7 @@ RUN;
 
 data overdose_spine;
     set overdose_spine;
-    where OD_YEAR >= 2014;
+    WHERE OD_YEAR >= 2014;
 RUN;
 
 PROC SQL;
@@ -3706,7 +3706,7 @@ keeping only the earliest flag for each month. Finally, the script extracts the 
 Thus, the outcome IS a long table, where each birth has 108 rows (one row per month Jan 2014-Dec 2022) that IS flagged either pregnant OR post-partum. */
 data all_births;
     set PHDBIRTH.BIRTH_MOM (keep=ID BIRTH_LINK_ID MONTH_BIRTH YEAR_BIRTH
-        where=(YEAR_BIRTH IN &year));
+        WHERE=(YEAR_BIRTH IN &year));
 RUN;
 
 data infants;
@@ -4251,7 +4251,7 @@ IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND
 
     data PREPARED_DATA;
         set PREPARED_DATA;
-        where FINAL_SEX=2;
+        WHERE FINAL_SEX=2;
     RUN;
 
     PROC SQL;
@@ -4509,18 +4509,18 @@ RUN;
 title "DIAGNOSTIC 1A: Initiations per episode";
 
 proc sql;
-    select
+    SELECT
         min(n_init) as min_init,
         max(n_init) as max_init,
         sum(case when n_init=0 then 1 else 0 end)
             as episodes_with_no_init,
         sum(case when n_init>1 then 1 else 0 end)
             as episodes_with_multiple_init
-    from (
-        select
+    FROM (
+        SELECT
             episode_id,
             sum(moud_init) as n_init
-        from moud_table
+        FROM moud_table
         group by episode_id
     );
 quit;
@@ -4539,10 +4539,10 @@ quit;
 title "DIAGNOSTIC 1B: Episode count versus initiation count";
 
 proc sql;
-    select
+    SELECT
         count(distinct episode_id) as total_episodes,
         sum(moud_init) as total_initiations
-    from moud_table;
+    FROM moud_table;
 quit;
 
 /***************************************************************************/
@@ -4559,9 +4559,9 @@ quit;
 title "DIAGNOSTIC 2A: Impossible pregnancy states";
 
 proc sql;
-    select count(*) as n_impossible
-    from moud_spine_preg
-    where has_pregnancy=0
+    SELECT count(*) as n_impossible
+    FROM moud_spine_preg
+    WHERE has_pregnancy=0
       and group ne 0;
 quit;
 
@@ -4579,10 +4579,10 @@ quit;
 title "DIAGNOSTIC 2B: Women with has_pregnancy=1 but never leave 9999";
 
 proc sql;
-    select count(*) as n_impossible
-    from (
-        select ID
-        from moud_spine_preg
+    SELECT count(*) as n_impossible
+    FROM (
+        SELECT ID
+        FROM moud_spine_preg
         group by ID
         having max(case when group in (1,2,3,4,5,6)
                         then 1 else 0 end)=0
@@ -4593,9 +4593,9 @@ quit;
 title "DIAGNOSTIC 2C: Missing initiation classification at spine level";
 
 proc sql;
-    select count(*) as n_impossible
-    from moud_spine_preg
-    where moud_init=1
+    SELECT count(*) as n_impossible
+    FROM moud_spine_preg
+    WHERE moud_init=1
       and group ne 0
       and missing(moud_start_group);
 quit;
@@ -4613,11 +4613,11 @@ quit;
 title "DIAGNOSTIC 3A: Distribution of pregnancy group at initiation";
 
 proc sql;
-    select
+    SELECT
         group,
         count(*) as n
-    from moud_spine_preg
-    where moud_init = 1
+    FROM moud_spine_preg
+    WHERE moud_init = 1
     group by group
     order by group;
 quit;
@@ -4629,10 +4629,10 @@ quit;
 title "DIAGNOSTIC 3B: Missing classification at initiation";
 
 proc sql;
-    select
+    SELECT
         count(*) as n_impossible
-    from moud_spine_preg
-    where moud_init = 1
+    FROM moud_spine_preg
+    WHERE moud_init = 1
       and group in (1,2,3,4,5,6)
       and missing(moud_start_group);
 quit;
@@ -4644,13 +4644,13 @@ quit;
 title "Diagnostic 3C: Initiation classification cross-tab";
 
 proc sql;
-    select
+    SELECT
         has_pregnancy,
         group,
         moud_start_group,
         count(*) as n
-    from moud_spine_preg
-    where moud_init = 1
+    FROM moud_spine_preg
+    WHERE moud_init = 1
     group by has_pregnancy, group, moud_start_group
     order by has_pregnancy, group, moud_start_group;
 quit;
@@ -4675,12 +4675,12 @@ quit;
 title "DIAGNOSTIC 3D: Pregnancy timing vs initiation classification";
 
 proc sql;
-    select
+    SELECT
         preg_flag,
         moud_start_group,
         count(*) as n
-    from moud_spine_preg
-    where moud_init = 1
+    FROM moud_spine_preg
+    WHERE moud_init = 1
     group by preg_flag, moud_start_group
     order by preg_flag, moud_start_group;
 quit;
@@ -4734,10 +4734,10 @@ QUIT;
 title "DIAGNOSTIC 4A: Missing start group after collapse";
 
 proc sql;
-    select
+    SELECT
         count(*) as n_impossible
-    from collapsed
-    where moud_init = 1
+    FROM collapsed
+    WHERE moud_init = 1
       and group in (1,2,3,4,5,6)
       and missing(moud_start_group);
 quit;
@@ -4749,13 +4749,13 @@ quit;
 title "Diagnostic 4B: Post-collapse initiation cross-tab";
 
 proc sql;
-    select
+    SELECT
         has_pregnancy,
         group,
         moud_start_group,
         count(*) as n
-    from collapsed
-    where moud_init = 1
+    FROM collapsed
+    WHERE moud_init = 1
     group by has_pregnancy, group, moud_start_group
     order by has_pregnancy, group, moud_start_group;
 quit;
@@ -4764,19 +4764,19 @@ title "DIAGNOSTIC 4C: Row survival check across collapse";
 
 proc sql;
 create table compare_inits as
-select
+SELECT
     a.ID,
     a.episode_id,
     a.year,
     a.month,
     a.moud_start_group as episode_group,
     b.moud_start_group as collapsed_group
-from moud_spine_preg a
+FROM moud_spine_preg a
 left join collapsed b
     on a.ID=b.ID
    and a.year=b.year
    and a.month=b.month
-where a.moud_init=1;
+WHERE a.moud_init=1;
 quit;
 
 proc freq data=compare_inits;
@@ -4797,11 +4797,11 @@ run;
 title "DIAGNOSTIC 5A: Pregnancy vs group consistency";
 
 proc sql;
-    select
+    SELECT
         has_pregnancy,
         group,
         count(*) as n
-    from collapsed
+    FROM collapsed
     group by has_pregnancy, group
     order by has_pregnancy, group;
 quit;
@@ -4814,10 +4814,10 @@ quit;
 title "DIAGNOSTIC 5B: Impossible states check";
 
 proc sql;
-    select
+    SELECT
         count(*) as n_impossible
-    from collapsed
-    where group in (1,2,3,4,5,6)
+    FROM collapsed
+    WHERE group in (1,2,3,4,5,6)
       and has_pregnancy = 0;
 quit;
 
@@ -4839,10 +4839,10 @@ quit;
 title "DIAGNOSTIC 6: Missing after join";
 
 proc sql;
-    select
+    SELECT
         count(*) as n_impossible
-    from prepared_data
-    where moud_init = 1
+    FROM prepared_data
+    WHERE moud_init = 1
       and group in (1,2,3,4,5,6)
       and missing(moud_start_group);
 quit;
@@ -4912,10 +4912,10 @@ RUN;
 title "DIAGNOSTIC 7A: Missing after carry-forward (active MOUD)";
 
 proc sql;
-    select
+    SELECT
         count(*) as n_impossible
-    from prepared_data
-    where moud_flag = 1
+    FROM prepared_data
+    WHERE moud_flag = 1
       and group in (1,2,3,4,5,6)
       and missing(moud_start_group);
 quit;
@@ -4934,13 +4934,13 @@ quit;
 title "DIAGNOSTIC 8A: Full structural cross-tab";
 
 proc sql;
-    select
+    SELECT
         group,
         moud_flag,
         moud_init,
         moud_start_group,
         count(*) as n
-    from prepared_data
+    FROM prepared_data
     group by group, moud_flag, moud_init, moud_start_group
     order by group, moud_flag, moud_init, moud_start_group;
 quit;
@@ -4973,14 +4973,14 @@ quit;
 title "DIAGNOSTIC 8B: Problematic rows by pregnancy stage";
 
 proc sql;
-    select
+    SELECT
         group,
         moud_flag,
         moud_init,
         moud_cessation,
         count(*) as n
-    from prepared_data
-    where missing(moud_start_group)
+    FROM prepared_data
+    WHERE missing(moud_start_group)
       and group in (1,2,3,4,5,6)
     group by
         group,
@@ -5565,7 +5565,7 @@ RUN;
 /* Filter the overdose data to keep only records from our cohort AND from the year 2014 AND onwards */
 data overdose;
     set overdose;
-    where OD_YEAR >= 2014;
+    WHERE OD_YEAR >= 2014;
 RUN;
 
 PROC SQL;
