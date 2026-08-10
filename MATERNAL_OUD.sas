@@ -32,7 +32,7 @@ RUN;
 /*  	GLOBAL VARIABLES   	    */
 /*==============================*/
 %LET year=(2014:2022);
-%LET MOUD_leniency=30;
+%LET MOUD_leniency=31;
 %let today=%sysfunc(today(), date9.);
 %let formatted_date=%sysfunc(translate(&today, %str(_), %str(/)));
 
@@ -908,7 +908,6 @@ RUN;
 /*=====================================*/
 /* 2. Filter, Deduplicate, AND Refine  */
 /*=====================================*/
-
 /* This section sorts the MOUD dataset by episode ID, type, AND date. It defines start AND end dates
 for each episode, removes short episodes, ensures uniqueness, AND resolves overlapping treatment periods. Then,
 it filters for records starting IN 2014 OR later, AND retains only individuals present IN the `oud_distinct` dataset */
@@ -926,44 +925,44 @@ RUN;
 DATA moud_demo;
     SET moud_demo;
     BY ID TYPE_MOUD;
-    RETAIN new_start_date new_end_date new_start_month new_start_year
-        new_end_month new_end_year YOB FINAL_RE age_grp_five BIRTH_INDICATOR;
+    RETAIN start_date new_start_date new_end_date new_start_month new_start_year 
+           new_end_month new_end_year YOB FINAL_RE age_grp_five BIRTH_INDICATOR;
 
     IF FIRST.ID OR FIRST.TYPE_MOUD THEN DO;
-        new_start_date=start_date;
-        new_start_month=start_month;
-        new_start_year=start_year;
+        new_start_date = start_date;
+        new_start_month = start_month;
+        new_start_year = start_year;
 
-        new_end_date=end_date;
-        new_end_month=end_month;
-        new_end_year=end_year;
+        new_end_date = end_date;
+        new_end_month = end_month;
+        new_end_year = end_year;
     END;
     ELSE DO;
-        diff_days=start_date - new_end_date;
+        diff_days = start_date - new_end_date;
 
-        if diff_days <= &MOUD_leniency then do;
-            if end_date > new_end_date then do;
-                new_end_date=end_date;
-                new_end_month=end_month;
-                new_end_year=end_year;
-            end;
-        end;
+	if diff_days <= &MOUD_leniency then do;
+	    if end_date > new_end_date then do;
+	        new_end_date  = end_date;
+	        new_end_month = end_month;
+	        new_end_year  = end_year;
+	    end;
+	end;
 
         ELSE DO;
             OUTPUT;
-            new_start_date=start_date;
-            new_start_month=start_month;
-            new_start_year=start_year;
+            new_start_date = start_date;
+            new_start_month = start_month;
+            new_start_year = start_year;
 
-            new_end_date=end_date;
-            new_end_month=end_month;
-            new_end_year=end_year;
+            new_end_date = end_date;
+            new_end_month = end_month;
+            new_end_year = end_year;
         END;
     END;
     IF LAST.ID OR LAST.TYPE_MOUD THEN OUTPUT;
 
-    DROP diff_days start_date end_date start_month end_month start_year
-        end_year;
+
+    DROP start_date end_date start_month end_month start_year end_year;
 RUN;
 
 PROC SQL;
@@ -999,27 +998,36 @@ DATA moud_demo;
     IF flag_mim=1 THEN DELETE;
 
     DROP NED;
+
 RUN;
 
 PROC SORT data=moud_demo;
     BY ID new_start_date;
 RUN;
 
-PROC SQL;
-    CREATE TABLE moud_demo AS
-    SELECT 
-        a.*, 
-        MIN(b.new_start_date) AS next_start_date, 
-        MIN(b.new_start_month) AS next_start_month,
-        MIN(b.new_start_year) AS next_start_year
-    FROM moud_demo AS a
-    LEFT JOIN moud_demo AS b 
-        ON a.ID=b.ID 
-            AND a.TYPE_MOUD ne b.TYPE_MOUD 
-            AND b.new_start_date > a.new_start_date
-    GROUP BY a.ID, a.TYPE_MOUD,
-        a.new_start_date ORDER BY a.ID, a.new_start_date;
-QUIT;
+proc sql;
+create table moud_demo_tmp as
+select a.*,
+       b.new_start_date  as next_start_date,
+       b.new_start_month as next_start_month,
+       b.new_start_year  as next_start_year
+from moud_demo a
+left join moud_demo b
+on a.ID=b.ID
+and a.TYPE_MOUD ne b.TYPE_MOUD
+and b.new_start_date =
+(
+   select min(c.new_start_date)
+   from moud_demo c
+   where c.ID=a.ID
+   and c.TYPE_MOUD ne a.TYPE_MOUD
+   and c.new_start_date > a.new_start_date
+);
+quit;
+
+DATA moud_demo;
+	SET moud_demo_tmp;
+RUN;
 
 data moud_demo;
     set moud_demo;
@@ -1041,6 +1049,13 @@ QUIT;
 
 data moud_demo;
     set moud_demo;
+
+    if (new_end_date - new_start_date) < &MOUD_LENIENCY then delete;
+
+run;
+
+data moud_demo;
+    set moud_demo;
     retain episode_num;
     by ID;
     if first.ID then episode_num=1;
@@ -1048,15 +1063,9 @@ data moud_demo;
     episode_id=catx("_", ID, episode_num);
 RUN;
 
-PROC SQL;
-    SELECT count(*) AS missing_new_end_date
-    FROM moud_demo
-    WHERE new_end_date IS missing;
-QUIT;
-
 data moud_demo;
     set moud_demo;
-    where new_start_year >= 2014;
+    WHERE new_start_year >= 2014;
 RUN;
 
 PROC SQL;
@@ -1436,7 +1445,7 @@ RUN;
 
 data overdose_spine;
     set overdose_spine;
-    where OD_YEAR >= 2014;
+    WHERE OD_YEAR >= 2014;
 RUN;
 
 PROC SQL;
@@ -3579,7 +3588,7 @@ keeping only the earliest flag for each month. Finally, the script extracts the 
 Thus, the outcome IS a long table, where each birth has 108 rows (one row per month Jan 2014-Dec 2022) that IS flagged either pregnant OR post-partum. */
 data all_births;
     set PHDBIRTH.BIRTH_MOM (keep=ID BIRTH_LINK_ID MONTH_BIRTH YEAR_BIRTH
-        where=(YEAR_BIRTH IN &year));
+        WHERE=(YEAR_BIRTH IN &year));
 RUN;
 
 data infants;
@@ -3912,35 +3921,31 @@ IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND
         ON a.EPISODE_ID=b.EPISODE_ID;
     QUIT;
 
-    title "MOUD Duration Sum Stats";
-
-    PROC SQL;
-        CREATE TABLE duration_means AS
-    SELECT DISTINCT episode_id, moud_duration, preg_flag
-    FROM moud_table
-    WHERE moud_duration IS NOT missing AND moud_duration ne 0;
-    QUIT;
-
-    proc means data=duration_means SUM mean median std MIN max q1 q3;
-        var moud_duration;
-    RUN;
-
-    proc sort data=duration_means;
-        by preg_flag;
-    RUN;
-
-    proc means data=duration_means SUM mean median std MIN max q1 q3;
-        by preg_flag;
-        var moud_duration;
-    RUN;
-    title;
-
     /* Create moud cessation variable */
     data MOUD_TABLE;
         set MOUD_TABLE;
         if new_end_month=MONTH AND new_end_year=YEAR then moud_cessation=1;
         else moud_cessation=0;
     RUN;
+
+    proc sql;
+    create table moud_table as
+    select
+        a.*,
+        b.valid_episode
+    from moud_table as a
+    left join (
+        select
+            episode_id,
+            case
+                when sum(moud_init) = 1 then 1
+                else 0
+            end as valid_episode
+        from moud_table
+        group by episode_id
+    ) as b
+    on a.episode_id = b.episode_id;
+    quit;
 
     data prepared_data;
         set moud_table;
@@ -3978,10 +3983,19 @@ IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND
         max(moud_init) AS moud_init,
         max(moud_duration) AS moud_duration, 
         max(moud_cessation) AS moud_cessation, 
-        MIN(preg_flag) AS preg_flag
+        min(preg_flag) as preg_flag,
+        max(moud_duration) as moud_duration,
+        max(valid_episode) as valid_episode
     FROM PREPARED_DATA
     GROUP BY ID, year, month;
     QUIT;
+
+    proc sql;
+    create table PREPARED_DATA as
+    select *
+    from PREPARED_DATA
+    where valid_episode = 1;
+    quit;
 
     proc sort data=PREPARED_DATA;
         BY ID year month;
@@ -4122,11 +4136,6 @@ IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND
         else HOMELESS_HISTORY_GROUP='Unknown';
     RUN;
 
-    data PREPARED_DATA;
-        set PREPARED_DATA;
-        where FINAL_SEX=2;
-    RUN;
-
     PROC SQL;
         CREATE TABLE PREPARED_DATA AS
     SELECT 
@@ -4144,6 +4153,17 @@ IS a subset of only those that had an MOUD episode (to analyze MOUD duration AND
     FROM PREPARED_DATA AS a
     LEFT JOIN oud_distinct AS cov ON a.ID=cov.ID;
     QUIT;
+
+    proc means data=PREPARED_DATA mean median std min max q1 q3;
+    where moud_init = 1 and moud_duration > 0;
+    var moud_duration;
+    run;
+
+    proc means data=PREPARED_DATA mean median std min max q1 q3;
+    where moud_init = 1 and moud_duration > 0;
+    class FINAL_RE;
+    var moud_duration;
+    run;
 
 %mend;
 
@@ -4432,6 +4452,16 @@ data PREPARED_DATA;
 
     drop moud_start_group_cf pending_moud_start_group;
 RUN;
+
+DATA PREPARED_DATA_FILT;
+    SET PREPARED_DATA;
+    IF missing(moud_start_group) AND group NE 0 THEN DELETE;
+RUN;
+
+PROC DATASETS library=work NOLIST;
+    DELETE PREPARED_DATA;
+    CHANGE PREPARED_DATA_FILT = PREPARED_DATA;
+QUIT;
 
 PROC SQL;
     CREATE TABLE PERSON_TIME AS
@@ -4985,7 +5015,7 @@ RUN;
 /* Filter the overdose data to keep only records from our cohort AND from the year 2014 AND onwards */
 data overdose;
     set overdose;
-    where OD_YEAR >= 2014;
+    WHERE OD_YEAR >= 2014;
 RUN;
 
 PROC SQL;
